@@ -1,6 +1,6 @@
-# ZEAI
+# TrustGraph AI
 
-ZEAI analyzes recruitment notices and presents evidence that may indicate fraud. The frontend sends an analysis request to the backend, which runs it through this pipeline:
+TrustGraph AI analyzes recruitment notices and presents evidence that may indicate fraud. The frontend sends an analysis request to the backend, which runs it through this pipeline:
 
 1. **Process input** - normalize the submitted notice into text and metadata.
 2. **Extract evidence** - identify recruitment details such as organization, contacts, fees, and links.
