@@ -1,0 +1,95 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        String           @id @default(uuid())
+  name      String
+  email     String           @unique
+  password  String
+  role      String           @default("USER") // "USER" | "ADMIN"
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  analyses  AnalysisRecord[]
+}
+
+model AnalysisRecord {
+  id                 String   @id @default(uuid())
+  userId             String?
+  user               User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title              String
+  inputType          String   // TEXT, PDF, IMAGE, URL
+  rawInputContent    String
+  fileUrl            String?
+  sourceUrl          String?
+  status             String   @default("COMPLETED") // PENDING, PROCESSING, COMPLETED, FAILED
+  
+  extractedData      String   // JSON string
+  recruitmentDna     String   // JSON string
+  evidenceGraph      String   // JSON string
+  verificationResult String   // JSON string
+  fingerprintMatches String   // JSON string
+  aiReasoning        String   // JSON string
+  trustScore         Float
+  riskLevel          String   // VERIFIED_GENUINE, LOW_RISK, MEDIUM_RISK, HIGH_RISK, CRITICAL_SCAM
+  explainableResult  String   // JSON string
+  
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([userId, createdAt])
+}
+
+model OfficialRegistry {
+  id                     String   @id @default(uuid())
+  organizationName       String
+  orgAlias               String   // Comma separated or JSON array
+  officialWebsites       String   // JSON array
+  officialEmails         String   // JSON array
+  officialPhones         String   // JSON array
+  notificationIds        String   // JSON array
+  officialFees           Float?
+  officialPaymentMethods String   // JSON array
+  verifiedDomains        String   // JSON array
+  verifiedBy             String
+  lastUpdated            DateTime @default(now())
+}
+
+model KnownSuspiciousFingerprint {
+  id                 String   @id @default(uuid())
+  scamName           String
+  targetOrganization String
+  scamCategory       String
+  notificationId     String?
+  suspiciousWebsites String   // JSON array
+  suspiciousEmails   String   // JSON array
+  suspiciousPhones   String   // JSON array
+  upiDetails         String   // JSON array
+  qrCodes            String   // JSON array
+  logoHashes         String   // JSON array
+  threatLevel        String   @default("CRITICAL_SCAM")
+  reportedCount      Int      @default(1)
+  notes              String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model SystemWeights {
+  id                   String   @id @default("default_weights")
+  organizationWeight   Float    @default(15.0)
+  emailWeight          Float    @default(15.0)
+  phoneWeight          Float    @default(15.0)
+  upiWeight            Float    @default(20.0)
+  websiteWeight        Float    @default(15.0)
+  qrWeight             Float    @default(10.0)
+  logoWeight           Float    @default(4.0)
+  notificationIdWeight Float    @default(3.0)
+  dateWeight           Float    @default(3.0)
+  updatedAt            DateTime @default(now())
+}
