@@ -9,6 +9,7 @@
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
+    "auth:migrate": "ts-node prisma/migrateAuth.ts",
     "prisma:seed": "ts-node prisma/seed.ts"
   },
   "dependencies": {

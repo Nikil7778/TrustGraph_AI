@@ -7,18 +7,21 @@ const prisma = new PrismaClient();
 
 export async function createAnalysis(req: AuthRequest, res: Response): Promise<void> {
   try {
+    if (!req.user) {
+      res.status(401).json({ success: false, error: 'Unauthorized.' });
+      return;
+    }
     const { type, content, url } = req.body;
     const file = req.file;
 
     const inputType = type || (file ? (file.mimetype.includes('pdf') ? 'PDF' : 'IMAGE') : url ? 'URL' : 'TEXT');
-    const userId = req.user?.id;
 
     const result = await runFullPipeline({
       type: inputType,
       content,
       file,
       url,
-      userId
+      userId: req.user.id
     });
 
     res.status(201).json({
@@ -41,7 +44,7 @@ export async function getAnalysisById(req: AuthRequest, res: Response): Promise<
       return;
     }
 
-    if (record.userId && req.user && record.userId !== req.user.id && req.user.role !== 'ADMIN') {
+    if (record.userId !== req.user?.id && req.user?.role !== 'ADMIN') {
       res.status(403).json({ success: false, error: "Forbidden: You don't have permission to access this investigation." });
       return;
     }

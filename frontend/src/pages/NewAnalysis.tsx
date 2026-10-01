@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { FileText, FileUp, Image as ImageIcon, Link as LinkIcon, Sparkles, ArrowRight, Loader2, PlusCircle, RotateCcw, ShieldCheck } from 'lucide-react';
 import { Header } from '../components/layout/Header';
 import { PipelineStepper } from '../components/pipeline/PipelineStepper';
@@ -27,7 +27,7 @@ const PIPELINE_PROGRESS_STAGES = [
   'Synthesizing Explainable Final Dashboard'
 ];
 
-export const NewAnalysis: React.FC = () => {
+export const NewAnalysis: React.FC<{ initialStep?: number }> = ({ initialStep }) => {
   const { activeStep, setActiveStep, isAnalyzing, setIsAnalyzing, setActiveResult, setPipelineData, activeResult, pipelineData, resetAnalysis } = usePipeline();
 
   const [inputType, setInputType] = useState<InputType>('TEXT');
@@ -35,6 +35,10 @@ export const NewAnalysis: React.FC = () => {
   const [urlContent, setUrlContent] = useState<string>('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [currentProcessingStage, setCurrentProcessingStage] = useState<number>(0);
+
+  useEffect(() => {
+    if (initialStep) setActiveStep(initialStep);
+  }, [initialStep, setActiveStep]);
 
   const sampleScam = `OFFICIAL RECRUITMENT NOTIFICATION 2026
 Ministry of Defence - Direct Recruitment Drive

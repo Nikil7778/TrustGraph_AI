@@ -1,117 +1,65 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { loginUser, registerUser, fetchCurrentUser, fetchTestAccounts } from '../services/api';
+import { loginUser, registerUser, fetchCurrentUser, logoutUser } from '../services/api';
 
 export interface UserProfile {
   id: string;
-  name: string;
-  email: string;
+  username: string;
   role: string;
 }
 
 interface AuthContextType {
   user: UserProfile | null;
-  token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  testAccounts: UserProfile[];
-  login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
-  logout: () => void;
-  switchUser: (email: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<UserProfile>;
+  register: (username: string, password: string) => Promise<UserProfile>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [token, setToken] = useState<string | null>(localStorage.getItem('trust_ai_token'));
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [testAccounts, setTestAccounts] = useState<UserProfile[]>([]);
-
-  const loadProfile = async () => {
-    try {
-      const data = await fetchCurrentUser();
-      setUser(data);
-    } catch (err) {
-      console.warn('Failed to load user profile with current token, clearing:', err);
-      logout();
-    }
-  };
-
-  const loadAccounts = async () => {
-    try {
-      const accounts = await fetchTestAccounts();
-      setTestAccounts(accounts);
-    } catch (err) {
-      console.warn('Could not load test accounts list:', err);
-    }
-  };
 
   useEffect(() => {
-    const initAuth = async () => {
-      setIsLoading(true);
-      await loadAccounts();
-
-      const existingToken = localStorage.getItem('trust_ai_token');
-      if (existingToken) {
-        setToken(existingToken);
-        await loadProfile();
-      } else {
-        // Auto-login as User A for seamless prototype experience
-        try {
-          const res = await loginUser('userA@example.com', 'password123');
-          localStorage.setItem('trust_ai_token', res.token);
-          setToken(res.token);
-          setUser(res.user);
-        } catch (e) {
-          console.warn('Auto-login as User A failed:', e);
-        }
-      }
-      setIsLoading(false);
-    };
-
-    initAuth();
+    localStorage.removeItem('trust_ai_token');
+    const handleSessionExpired = () => setUser(null);
+    window.addEventListener('jobguard:session-expired', handleSessionExpired);
+    fetchCurrentUser()
+      .then(setUser)
+      .catch(() => setUser(null))
+      .finally(() => setIsLoading(false));
+    return () => window.removeEventListener('jobguard:session-expired', handleSessionExpired);
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = async (username: string, password: string) => {
     setIsLoading(true);
     try {
-      const res = await loginUser(email, password);
-      localStorage.setItem('trust_ai_token', res.token);
-      setToken(res.token);
+      const res = await loginUser(username, password);
       setUser(res.user);
+      return res.user as UserProfile;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const register = async (name: string, email: string, password: string) => {
+  const register = async (username: string, password: string) => {
     setIsLoading(true);
     try {
-      const res = await registerUser(name, email, password);
-      localStorage.setItem('trust_ai_token', res.token);
-      setToken(res.token);
+      const res = await registerUser(username, password);
       setUser(res.user);
+      return res.user as UserProfile;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('trust_ai_token');
-    setToken(null);
-    setUser(null);
-  };
-
-  const switchUser = async (email: string) => {
-    setIsLoading(true);
-    const password = email.includes('admin') ? 'admin123' : 'password123';
+  const logout = async () => {
     try {
-      await login(email, password);
-    } catch (err) {
-      console.error(`Error switching to user ${email}:`, err);
+      await logoutUser();
     } finally {
-      setIsLoading(false);
+      setUser(null);
     }
   };
 
@@ -119,14 +67,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider
       value={{
         user,
-        token,
-        isAuthenticated: !!token && !!user,
+        isAuthenticated: !!user,
         isLoading,
-        testAccounts,
         login,
         register,
-        logout,
-        switchUser
+        logout
       }}
     >
       {children}

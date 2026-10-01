@@ -8,14 +8,18 @@ generator client {
 }
 
 model User {
-  id        String           @id @default(uuid())
-  name      String
-  email     String           @unique
-  password  String
-  role      String           @default("USER") // "USER" | "ADMIN"
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
-  analyses  AnalysisRecord[]
+  id                 String           @id @default(uuid())
+  username           String           @unique
+  usernameNormalized String           @unique
+  name               String?
+  email              String?          @unique
+  password           String?
+  passwordHash       String
+  role               String           @default("USER")
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  lastLogin           DateTime?
+  analyses            AnalysisRecord[]
 }
 
 model AnalysisRecord {

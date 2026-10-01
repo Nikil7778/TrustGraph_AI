@@ -111,6 +111,7 @@ export interface OfficialVerificationRow {
 export interface OfficialVerificationResult {
   matchedRecordId: string | null;
   officialOrgName: string | null;
+  officialWebsiteUrl: string | null;
   isOrgVerified: boolean;
   isWebsiteGovDomain: boolean;
   isWebsiteInOfficialList: boolean;

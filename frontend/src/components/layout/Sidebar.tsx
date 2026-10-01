@@ -1,17 +1,29 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { ShieldCheck, PlusCircle, History, ShieldAlert, Settings } from 'lucide-react';
+import { ShieldCheck, PlusCircle, History, ShieldAlert, Settings, Users, Files, Activity, Fingerprint, Dna, BarChart3, UserRound } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import { usePipeline } from '../../context/PipelineContext';
 
 export const Sidebar: React.FC = () => {
   const { resetAnalysis } = usePipeline();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
 
   const navItems = [
-    { label: 'Home', path: '/', icon: ShieldCheck },
+    { label: 'Dashboard', path: isAdmin ? '/admin/dashboard' : '/dashboard', icon: ShieldCheck },
     { label: 'New Analysis', path: '/new-analysis', icon: PlusCircle },
     { label: 'History', path: '/history', icon: History },
+    { label: 'Profile', path: '/profile', icon: UserRound },
     { label: 'Threat Intelligence', path: '/threat-intel', icon: ShieldAlert },
-    { label: 'Settings', path: '/settings', icon: Settings },
+    ...(isAdmin ? [
+      { label: 'Users', path: '/admin/users', icon: Users },
+      { label: 'All Analyses', path: '/admin/analyses', icon: Files },
+      { label: 'Recruitment DNA', path: '/admin/recruitment-dna', icon: Dna },
+      { label: 'Suspicious Fingerprints', path: '/admin/fingerprints', icon: Fingerprint },
+      { label: 'Risk Statistics', path: '/admin/risk-statistics', icon: BarChart3 },
+      { label: 'System Activity', path: '/admin/system-activity', icon: Activity },
+      { label: 'Settings', path: '/settings', icon: Settings }
+    ] : []),
   ];
 
   return (

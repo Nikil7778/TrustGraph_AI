@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { ExplainableResultDashboard } from '../../types';
-import { ShieldAlert, Download, CheckCircle2, PlusCircle } from 'lucide-react';
+import { ShieldAlert, Download, CheckCircle2, PlusCircle, ExternalLink, Search } from 'lucide-react';
 import { usePipeline } from '../../context/PipelineContext';
 
 export const ExplainableDashboardView: React.FC<{ dashboard: ExplainableResultDashboard | null }> = ({ dashboard }) => {
@@ -15,6 +15,7 @@ export const ExplainableDashboardView: React.FC<{ dashboard: ExplainableResultDa
     fieldByFieldComparison: [],
     officialVerification: {
       officialOrgName: null,
+      officialWebsiteUrl: null,
       isOrgVerified: false,
       isWebsiteInOfficialList: false,
       isEmailInOfficialList: false,
@@ -25,7 +26,7 @@ export const ExplainableDashboardView: React.FC<{ dashboard: ExplainableResultDa
       notes: ['Verification results compiled.'],
       comparisonTable: []
     },
-    aiReasoning: { redFlags: [] },
+    aiReasoning: { redFlags: [], confidenceScore: 0 },
     recruitmentDna: {
       dnaId: 'RDNA-0000',
       canonicalHash: '0x00000000',
@@ -49,6 +50,7 @@ export const ExplainableDashboardView: React.FC<{ dashboard: ExplainableResultDa
 
   const submittedOrg = norm?.organization?.raw || 'Claimed Organization';
   const officialOrg = ver?.officialOrgName || (ver?.isOrgVerified ? submittedOrg : 'Unverified Registry Baseline');
+  const officialLookupUrl = ver?.officialWebsiteUrl || `https://www.google.com/search?q=${encodeURIComponent(`${officialOrg === 'Unverified Registry Baseline' ? submittedOrg : officialOrg} official recruitment website`)}`;
   const orgMatch = ver?.isOrgVerified && (ver?.officialOrgName ? ver.officialOrgName.toUpperCase().includes(submittedOrg.toUpperCase()) || submittedOrg.toUpperCase().includes(ver.officialOrgName.toUpperCase()) : true);
 
   const verificationRows: any[] = res.officialVerification?.comparisonTable && res.officialVerification.comparisonTable.length > 0
@@ -89,6 +91,17 @@ export const ExplainableDashboardView: React.FC<{ dashboard: ExplainableResultDa
           <div className="px-6 py-4 rounded-2xl bg-white/10 border border-white/15 text-center w-full">
             <p className="text-[10px] text-slate-300 uppercase tracking-widest font-bold">Calculated Trust Score</p>
             <p className="text-4xl font-black text-white font-mono mt-0.5">{res.trustScore?.overallScore} / 100</p>
+          </div>
+
+          <div className="w-full rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-center">
+            <div className="flex items-center justify-between gap-3 text-xs">
+              <span className="font-bold text-slate-200">Evidence coverage</span>
+              <span className="font-mono font-extrabold text-white">{res.aiReasoning?.confidenceScore ?? 0}%</span>
+            </div>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/15">
+              <div className="h-full rounded-full bg-cyan-300" style={{ width: `${Math.max(0, Math.min(100, res.aiReasoning?.confidenceScore ?? 0))}%` }} />
+            </div>
+            <p className="mt-2 text-left text-[10px] leading-4 text-slate-300">How many key notice fields were found. This is not a probability that the verdict is correct.</p>
           </div>
 
           <button
@@ -186,6 +199,24 @@ export const ExplainableDashboardView: React.FC<{ dashboard: ExplainableResultDa
             <span className="px-3 py-1 rounded-lg bg-blue-50 text-blue-700 font-bold text-xs border border-blue-200">
               Alignment Score: {res.officialVerification?.verificationScore || 15}/100
             </span>
+          </div>
+
+          <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h4 className="text-sm font-extrabold text-slate-900">Verify directly with the official source</h4>
+                <p className="mt-1 text-xs leading-5 text-slate-600">
+                  {ver?.officialWebsiteUrl
+                    ? 'This link comes from the app\'s reference registry. Confirm the recruitment notice on that site; this app does not live-check pages.'
+                    : 'No official site is listed in the app registry. Search for the organization independently; do not use the link from the notice.'}
+                </p>
+              </div>
+              <a href={officialLookupUrl} target="_blank" rel="noopener noreferrer"
+                className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-blue-700 px-4 py-2.5 text-xs font-extrabold text-white transition hover:bg-blue-800">
+                {ver?.officialWebsiteUrl ? <ExternalLink size={15} /> : <Search size={15} />}
+                {ver?.officialWebsiteUrl ? 'Open official website' : 'Find official website'}
+              </a>
+            </div>
           </div>
 
           <div className="border border-slate-200 rounded-2xl overflow-hidden">

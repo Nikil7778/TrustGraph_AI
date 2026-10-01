@@ -29,13 +29,6 @@ export const Home: React.FC = () => {
     }
   }, [user]);
 
-  // Seeded demo cases for reference
-  const globalDemoCases = [
-    { id: 'demo-1', title: 'Ministry of Defence Fake Direct Recruitment Drive', org: 'Ministry of Defence', score: 18, risk: 'CRITICAL_SCAM', badge: 'CRITICAL SCAM' },
-    { id: 'demo-2', title: 'Genuine Staff Selection Commission (SSC) CGL Notice', org: 'Staff Selection Commission (SSC)', score: 95, risk: 'VERIFIED_GENUINE', badge: 'VERIFIED GENUINE' },
-    { id: 'demo-3', title: 'Railway Recruitment Board (RRB) Phishing Guard Hiring', org: 'Railway Recruitment Board (RRB)', score: 32, risk: 'HIGH_RISK', badge: 'HIGH RISK' }
-  ];
-
   const getRiskBadge = (score: number, riskLevel: string) => {
     if (riskLevel === 'VERIFIED_GENUINE' || score >= 80) return { label: 'VERIFIED GENUINE', color: 'bg-emerald-100 text-emerald-800 border-emerald-200' };
     if (riskLevel === 'LOW_RISK' || score >= 60) return { label: 'LOW RISK', color: 'bg-blue-100 text-blue-800 border-blue-200' };
@@ -63,7 +56,7 @@ export const Home: React.FC = () => {
             </h1>
 
             <p className="text-slate-300 text-sm sm:text-base leading-relaxed font-normal">
-              Logged in as <span className="font-bold text-white">{user?.name || 'User'}</span> ({user?.email}). Analyze job offers with multi-factor verification, canonical DNA hashing, and AI risk reasoning.
+              Signed in as <span className="font-bold text-white">{user?.username || 'User'}</span>. Analyze job offers with multi-factor verification, canonical DNA hashing, and risk reasoning.
             </p>
 
             <div className="pt-4 flex flex-wrap items-center gap-4">
@@ -97,7 +90,7 @@ export const Home: React.FC = () => {
                 </span>
               </div>
               <p className="text-xs text-slate-500 font-medium mt-0.5">
-                Showing your latest 6 personal recruitment analysis records ({user?.email})
+                Showing your latest 6 personal recruitment analysis records ({user?.username})
               </p>
             </div>
 
@@ -147,7 +140,7 @@ export const Home: React.FC = () => {
           ) : (
             <div className="p-8 text-center space-y-3 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
               <FolderOpen className="w-8 h-8 text-slate-400 mx-auto" />
-              <p className="text-xs font-bold text-slate-700">No personal investigations yet for {user?.name}</p>
+              <p className="text-xs font-bold text-slate-700">No personal investigations yet for {user?.username}</p>
               <button
                 onClick={() => navigate('/new-analysis')}
                 className="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold shadow-sm hover:bg-blue-500 transition-colors"
@@ -158,36 +151,6 @@ export const Home: React.FC = () => {
           )}
         </div>
 
-        {/* SEPARATE GLOBAL APPLICATION DEMO CASES */}
-        <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-sm space-y-4">
-          <div className="border-b border-slate-100 pb-3">
-            <h3 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
-              <FolderOpen className="w-5 h-5 text-blue-600" />
-              <span>SYSTEM DEMO CASES</span>
-            </h3>
-            <p className="text-xs text-slate-500 font-medium mt-0.5">
-              Globally available benchmark reference cases provided by TRUST AI
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {globalDemoCases.map((demo) => {
-              const badge = getRiskBadge(demo.score, demo.risk);
-              return (
-                <div key={demo.id} className="p-4 rounded-2xl border border-slate-200 bg-white space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase font-mono">DEMO CASE</span>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold border ${badge.color}`}>
-                      {badge.label}
-                    </span>
-                  </div>
-                  <h4 className="text-xs font-bold text-slate-900 leading-snug">{demo.title}</h4>
-                  <p className="text-[11px] text-slate-500">{demo.org}</p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
       </main>
     </div>
   );

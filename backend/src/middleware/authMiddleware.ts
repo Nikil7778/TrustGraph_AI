@@ -1,12 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { PrismaClient } from '@prisma/client';
+import { JWT_SECRET, readSessionToken, clearSessionCookie } from '../utils/auth';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'trust_ai_jwt_secret_key_2026';
+const prisma = new PrismaClient();
 
 export interface AuthenticatedUser {
   id: string;
-  email: string;
-  name: string;
+  username: string;
   role: string;
 }
 
@@ -14,20 +15,30 @@ export interface AuthRequest extends Request {
   user?: AuthenticatedUser;
 }
 
-export function authenticateToken(req: AuthRequest, res: Response, next: NextFunction) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.substring(7) : null;
-
+export async function authenticateToken(req: AuthRequest, res: Response, next: NextFunction) {
+  const token = readSessionToken(req.headers.cookie);
   if (!token) {
-    return res.status(401).json({ error: 'Unauthorized: Authentication token is missing.' });
+    return res.status(401).json({ error: 'Unauthorized.' });
   }
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as AuthenticatedUser;
-    req.user = decoded;
+    const decoded = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload;
+    if (typeof decoded.sub !== 'string') throw new Error('Invalid session');
+
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.sub },
+      select: { id: true, username: true, role: true }
+    });
+    if (!user?.username) {
+      clearSessionCookie(res);
+      return res.status(401).json({ error: 'Unauthorized.' });
+    }
+
+    req.user = { id: user.id, username: user.username, role: user.role };
     next();
-  } catch (err) {
-    return res.status(401).json({ error: 'Unauthorized: Invalid or expired authentication token.' });
+  } catch {
+    clearSessionCookie(res);
+    return res.status(401).json({ error: 'Unauthorized.' });
   }
 }
 

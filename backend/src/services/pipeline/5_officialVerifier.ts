@@ -11,6 +11,17 @@ export interface OfficialRegistryRecord {
   verifiedDomains: string[];
 }
 
+function toHttpsUrl(value?: string): string | null {
+  if (!value) return null;
+  const candidate = value.startsWith('http') ? value : `https://${value}`;
+  try {
+    const parsed = new URL(candidate);
+    return parsed.protocol === 'https:' ? parsed.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 export function verifyAgainstOfficialRegistry(
   dna: RecruitmentDNA,
   officialRegistry: OfficialRegistryRecord[]
@@ -239,6 +250,9 @@ export function verifyAgainstOfficialRegistry(
   return {
     matchedRecordId: matchedRecord ? matchedRecord.id : null,
     officialOrgName: matchedRecord ? matchedRecord.organizationName : (isOrgProvided ? norm.organization.raw : null),
+    officialWebsiteUrl: matchedRecord
+      ? toHttpsUrl(matchedRecord.officialWebsites[0] || matchedRecord.verifiedDomains[0])
+      : null,
     isOrgVerified: Boolean(matchedRecord),
     isWebsiteGovDomain: norm.website.isGovDomain,
     isWebsiteInOfficialList: isWebOfficial,

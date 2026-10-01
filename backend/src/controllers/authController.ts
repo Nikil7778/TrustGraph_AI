@@ -1,93 +1,90 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
 import { AuthRequest } from '../middleware/authMiddleware';
+import { clearSessionCookie, isValidUsername, issueSessionCookie, normalizeUsername, safeUser } from '../utils/auth';
 
 const prisma = new PrismaClient();
-const JWT_SECRET = process.env.JWT_SECRET || 'trust_ai_jwt_secret_key_2026';
+
+export async function checkUsername(req: Request, res: Response) {
+  try {
+    const username = String(req.params.username || '').trim();
+    if (!isValidUsername(username)) {
+      return res.status(200).json({ available: false, reason: 'INVALID_USERNAME' });
+    }
+
+    const usernameNormalized = normalizeUsername(username);
+    if (usernameNormalized === 'admin') {
+      return res.json({ available: false, reason: 'RESERVED_USERNAME' });
+    }
+
+    const existing = await prisma.user.findUnique({ where: { usernameNormalized } });
+    return res.json(existing
+      ? { available: false, reason: 'USERNAME_EXISTS' }
+      : { available: true });
+  } catch {
+    return res.status(500).json({ error: 'Unable to check username availability.' });
+  }
+}
 
 export async function register(req: Request, res: Response) {
   try {
-    const { name, email, password } = req.body;
-
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: 'Name, email, and password are required.' });
+    const username = typeof req.body.username === 'string' ? req.body.username.trim() : '';
+    const password = typeof req.body.password === 'string' ? req.body.password : '';
+    if (!isValidUsername(username)) {
+      return res.status(400).json({ error: 'Username must be 3-24 characters using letters, numbers, or underscores.' });
+    }
+    const usernameNormalized = normalizeUsername(username);
+    if (usernameNormalized === 'admin') {
+      return res.status(400).json({ error: 'This username is reserved. Please try another username.' });
+    }
+    if (password.length < 8 || Buffer.byteLength(password, 'utf8') > 72) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters and no more than 72 bytes.' });
     }
 
-    const existingUser = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
-    if (existingUser) {
-      return res.status(400).json({ error: 'A user with this email address already exists.' });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const newUser = await prisma.user.create({
+    const passwordHash = await bcrypt.hash(password, 12);
+    const user = await prisma.user.create({
       data: {
-        name,
-        email: email.toLowerCase(),
-        password: hashedPassword,
+        username,
+        usernameNormalized,
+        passwordHash,
         role: 'USER'
       }
     });
-
-    const token = jwt.sign(
-      { id: newUser.id, email: newUser.email, name: newUser.name, role: newUser.role },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    return res.status(201).json({
-      token,
-      user: {
-        id: newUser.id,
-        name: newUser.name,
-        email: newUser.email,
-        role: newUser.role
-      }
-    });
-  } catch (err: any) {
-    console.error('Registration error:', err);
-    return res.status(500).json({ error: 'Internal server error during registration.' });
+    issueSessionCookie(res, user.id);
+    return res.status(201).json({ user: safeUser(user), message: 'Account created successfully.' });
+  } catch (error: any) {
+    if (error?.code === 'P2002') return res.status(409).json({ error: 'Username already exists. Please try another username.' });
+    return res.status(500).json({ error: 'Unable to create account.' });
   }
 }
 
 export async function login(req: Request, res: Response) {
   try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required.' });
+    const username = typeof req.body.username === 'string' ? req.body.username.trim() : '';
+    const password = typeof req.body.password === 'string' ? req.body.password : '';
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password are required.' });
+    }
+    const user = await prisma.user.findUnique({ where: { usernameNormalized: normalizeUsername(username) } });
+    if (!user || !user.passwordHash || !(await bcrypt.compare(password, user.passwordHash))) {
+      return res.status(401).json({ error: 'Incorrect username or password.' });
     }
 
-    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid email or password.' });
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(401).json({ error: 'Invalid email or password.' });
-    }
-
-    const token = jwt.sign(
-      { id: user.id, email: user.email, name: user.name, role: user.role },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    return res.json({
-      token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role
-      }
+    const updatedUser = await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLogin: new Date() }
     });
-  } catch (err: any) {
-    console.error('Login error:', err);
-    return res.status(500).json({ error: 'Internal server error during login.' });
+    issueSessionCookie(res, updatedUser.id);
+    return res.json({ user: safeUser(updatedUser), message: 'Login successful.' });
+  } catch {
+    return res.status(500).json({ error: 'Unable to log in.' });
   }
+}
+
+export function logout(_req: Request, res: Response) {
+  clearSessionCookie(res);
+  return res.json({ success: true });
 }
 
 export async function getMe(req: AuthRequest, res: Response) {
@@ -96,28 +93,14 @@ export async function getMe(req: AuthRequest, res: Response) {
       return res.status(401).json({ error: 'Unauthorized.' });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: req.user.id },
-      select: { id: true, name: true, email: true, role: true, createdAt: true }
-    });
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
 
     if (!user) {
       return res.status(404).json({ error: 'User not found.' });
     }
 
-    return res.json(user);
-  } catch (err: any) {
+    return res.json(safeUser(user));
+  } catch {
     return res.status(500).json({ error: 'Failed to fetch user profile.' });
-  }
-}
-
-export async function getTestAccounts(_req: Request, res: Response) {
-  try {
-    const users = await prisma.user.findMany({
-      select: { id: true, name: true, email: true, role: true }
-    });
-    return res.json(users);
-  } catch (err: any) {
-    return res.status(500).json({ error: 'Failed to fetch test accounts.' });
   }
 }

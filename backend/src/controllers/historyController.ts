@@ -192,7 +192,7 @@ export async function getAdminHistory(req: AuthRequest, res: Response) {
         take: limit,
         include: {
           user: {
-            select: { id: true, name: true, email: true, role: true }
+            select: { id: true, username: true, role: true }
           }
         }
       }),
@@ -204,7 +204,7 @@ export async function getAdminHistory(req: AuthRequest, res: Response) {
     return res.json({
       records: records.map(r => ({
         id: r.id,
-        user: r.user ? { id: r.user.id, name: r.user.name, email: r.user.email } : { id: 'unknown', name: 'Guest/Unassigned', email: 'guest@system' },
+        user: r.user ? { id: r.user.id, username: r.user.username } : { id: 'unknown', username: 'Unassigned' },
         title: r.title,
         inputType: r.inputType,
         trustScore: r.trustScore,

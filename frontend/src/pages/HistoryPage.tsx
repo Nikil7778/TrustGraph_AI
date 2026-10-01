@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../components/layout/Header';
 import { Search, FileText, ArrowRight, Trash2, ChevronLeft, ChevronRight, Lock, UserCheck, Shield } from 'lucide-react';
-import { fetchUserHistory, fetchHistoryById, deleteHistoryRecord, fetchAdminHistory, fetchTestAccounts } from '../services/api';
+import { fetchUserHistory, fetchHistoryById, deleteHistoryRecord, fetchAdminHistory, fetchAdminUsers } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { usePipeline } from '../context/PipelineContext';
 import type { AnalysisRecordItem } from '../types';
@@ -65,9 +65,9 @@ export const HistoryPage: React.FC = () => {
 
   useEffect(() => {
     if (user?.role === 'ADMIN') {
-      fetchTestAccounts().then(data => {
+      fetchAdminUsers().then(data => {
         setAdminUsers(data.users || []);
-      }).catch(err => console.error('Failed to fetch test accounts:', err));
+      }).catch(err => console.error('Failed to load users:', err));
     }
   }, [user]);
 
@@ -153,7 +153,7 @@ export const HistoryPage: React.FC = () => {
             <p className="text-sm text-slate-500 font-medium mt-1">
               {isAdminMode
                 ? 'Full cross-user database inspection and audit trail.'
-                : `Private investigation records for ${user?.name || 'Authenticated User'}. strictly filtered by your session.`}
+                : `Private investigation records for ${user?.username || 'Authenticated User'}, filtered by your session.`}
             </p>
           </div>
 
@@ -205,7 +205,7 @@ export const HistoryPage: React.FC = () => {
                 <option value="">All Users Records</option>
                 {adminUsers.map(u => (
                   <option key={u.id} value={u.id}>
-                    {u.name} ({u.role})
+                    {u.username} ({u.role})
                   </option>
                 ))}
               </select>
@@ -279,7 +279,7 @@ export const HistoryPage: React.FC = () => {
                       </td>
                       {isAdminMode && (
                         <td className="py-4 px-6 text-xs text-purple-700 font-bold">
-                          {(r as any).user?.name || (r as any).userId || 'Unknown'}
+                          {(r as any).user?.username || (r as any).userId || 'Unknown'}
                         </td>
                       )}
                       <td className="py-4 px-6 font-mono text-xs text-slate-600">{r.inputType}</td>

@@ -19,7 +19,8 @@ export function extractEvidence(rawText: string): DetailedExtractionResult {
   const emailMatch = text.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/i);
   const phoneMatch = text.match(/(\+91[\s-]?)?[6-9]\d{9}/);
   const urlMatch = text.match(/(https?:\/\/[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.(gov\.in|nic\.in|com|in|co\.in|org|net))/i);
-  const feeMatch = text.match(/₹\s?(\d+)|Rs\.?\s?(\d+)|fee[:\s]+(\d+)/i);
+  const feeMatch = text.match(/(?:application\s+fee|fee)\s*[:\-]?\s*(?:₹\s*)?([\d,]+)/i)
+    || text.match(/₹\s?([\d,]+)|Rs\.?\s?([\d,]+)/i);
   const notifMatch = text.match(/(CEN|MOD|SSC|RRB|UPSC|JOB|REF)[/\-_A-Z0-9]{3,20}/i);
 
   // Check organizational keywords
@@ -54,7 +55,7 @@ export function extractEvidence(rawText: string): DetailedExtractionResult {
 
   const website = urlMatch ? urlMatch[0] : null;
   const notifId = notifMatch ? notifMatch[0] : null;
-  const fee = feeMatch ? parseInt(feeMatch[1] || feeMatch[2] || feeMatch[3], 10) : null;
+  const fee = feeMatch ? parseInt((feeMatch[1] || feeMatch[2]).replace(/,/g, ''), 10) : null;
 
   // Detect job designation
   const jobMatch = text.match(/(designation|post|vacancy|role|position)[:\s]+([^\n.,;]+)/i);

@@ -15,9 +15,9 @@ export const AIRiskReasoningView: React.FC<{ data: AIRiskReasoning; onNext: () =
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-extrabold text-slate-900">AI Risk Analysis & Reasoning</h2>
+          <h2 className="text-2xl font-extrabold text-slate-900">Risk Analysis & Reasoning</h2>
           <p className="text-sm text-slate-500 font-medium mt-1">
-            Chain-of-thought analysis evaluating structural anomalies, threat indicators, and red flag proofs.
+            Rule-based review of extracted evidence, registry comparisons, and known risk indicators.
           </p>
         </div>
         <button
@@ -27,6 +27,17 @@ export const AIRiskReasoningView: React.FC<{ data: AIRiskReasoning; onNext: () =
           <span>Next: Trust Score</span>
           <ArrowRight className="w-4 h-4" />
         </button>
+      </div>
+
+      <div className="max-w-sm rounded-xl border border-blue-200 bg-blue-50 p-4">
+        <div className="flex items-center justify-between gap-4 text-xs">
+          <span className="font-bold text-slate-700">Evidence coverage</span>
+          <span className="font-mono font-extrabold text-blue-900">{reasoning.confidenceScore ?? 0}%</span>
+        </div>
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-blue-100">
+          <div className="h-full rounded-full bg-blue-600" style={{ width: `${Math.max(0, Math.min(100, reasoning.confidenceScore ?? 0))}%` }} />
+        </div>
+        <p className="mt-2 text-[11px] leading-4 text-slate-600">Share of key notice fields detected. This is not a probability that the result is correct.</p>
       </div>
 
       <div className="p-5 rounded-3xl bg-red-500 text-white shadow-lg space-y-2">

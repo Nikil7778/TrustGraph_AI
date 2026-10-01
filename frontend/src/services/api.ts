@@ -1,31 +1,40 @@
 import axios from 'axios';
 import type { AnalysisRecordItem, ExplainableResultDashboard, InputType } from '../types';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
 const client = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000
+  timeout: 15000,
+  withCredentials: true
 });
 
-// Attach JWT token dynamically to all backend requests
-client.interceptors.request.use((config) => {
-  const token = localStorage.getItem('trust_ai_token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+client.interceptors.response.use(response => response, error => {
+  const url = String(error.config?.url || '');
+  if (error.response?.status === 401 && !/\/auth\/(login|signup|register|check-username)/.test(url)) {
+    window.dispatchEvent(new Event('jobguard:session-expired'));
   }
-  return config;
+  return Promise.reject(error);
 });
 
 // Authentication APIs
-export async function loginUser(email: string, password: string) {
-  const res = await client.post('/auth/login', { email, password });
+export async function loginUser(username: string, password: string) {
+  const res = await client.post('/auth/login', { username, password });
   return res.data;
 }
 
-export async function registerUser(name: string, email: string, password: string) {
-  const res = await client.post('/auth/register', { name, email, password });
+export async function registerUser(username: string, password: string) {
+  const res = await client.post('/auth/signup', { username, password });
   return res.data;
+}
+
+export async function checkUsername(username: string) {
+  const res = await client.get(`/auth/check-username/${encodeURIComponent(username)}`);
+  return res.data as { available: boolean; reason?: string };
+}
+
+export async function logoutUser() {
+  await client.post('/auth/logout');
 }
 
 export async function fetchCurrentUser() {
@@ -33,8 +42,23 @@ export async function fetchCurrentUser() {
   return res.data;
 }
 
-export async function fetchTestAccounts() {
-  const res = await client.get('/auth/test-accounts');
+export async function fetchAdminDashboard() {
+  const res = await client.get('/admin/dashboard');
+  return res.data;
+}
+
+export async function fetchAdminUsers(params?: { page?: number; limit?: number }) {
+  const res = await client.get('/admin/users', { params });
+  return res.data;
+}
+
+export async function fetchAdminAnalyses(params?: { page?: number; limit?: number }) {
+  const res = await client.get('/admin/analyses', { params });
+  return res.data;
+}
+
+export async function fetchAdminFingerprints() {
+  const res = await client.get('/admin/fingerprints');
   return res.data;
 }
 
@@ -45,13 +69,8 @@ export async function fetchUserHistory(params?: {
   search?: string;
   riskLevel?: string;
 }): Promise<{ records: any[]; total: number; page: number; limit: number; totalPages: number }> {
-  try {
-    const res = await client.get('/history', { params });
-    return res.data;
-  } catch (error) {
-    console.warn('Backend history fetch error, returning fallback:', error);
-    return { records: getMockHistoryList(), total: 4, page: 1, limit: 20, totalPages: 1 };
-  }
+  const res = await client.get('/history', { params });
+  return res.data;
 }
 
 export async function fetchHistoryById(id: string): Promise<any> {
@@ -75,32 +94,22 @@ export async function submitNewAnalysis(params: {
   file?: File;
   url?: string;
 }): Promise<{ recordId: string; dashboard: ExplainableResultDashboard; pipelineSteps: any }> {
-  try {
-    const formData = new FormData();
-    formData.append('type', params.type);
-    if (params.content) formData.append('content', params.content);
-    if (params.url) formData.append('url', params.url);
-    if (params.file) formData.append('file', params.file);
+  const formData = new FormData();
+  formData.append('type', params.type);
+  if (params.content) formData.append('content', params.content);
+  if (params.url) formData.append('url', params.url);
+  if (params.file) formData.append('file', params.file);
 
-    const res = await client.post('/analysis/create', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
+  const res = await client.post('/analysis/create', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
 
-    return res.data.data;
-  } catch (error) {
-    console.warn('Backend API connection failed, executing client-side fallback engine:', error);
-    return mockAnalysisFallback(params);
-  }
+  return res.data.data;
 }
 
 export async function fetchAnalysisHistory(): Promise<AnalysisRecordItem[]> {
-  try {
-    const res = await client.get('/history?limit=6');
-    return res.data.records || [];
-  } catch (error) {
-    console.warn('Backend offline, returning mock history data');
-    return getMockHistoryList();
-  }
+  const res = await client.get('/history?limit=6');
+  return res.data.records || [];
 }
 
 export async function fetchThreatIntelligence(): Promise<any[]> {
@@ -150,7 +159,7 @@ export async function saveWeights(weights: any): Promise<any> {
 }
 
 // Client Fallback Data Generator
-function mockAnalysisFallback(params: any) {
+export function mockAnalysisFallback(params: any) {
   const isScam = !params.content?.includes('ssc.gov.in');
 
   const mockDna = {
@@ -212,6 +221,7 @@ function mockAnalysisFallback(params: any) {
     officialVerification: {
       matchedRecordId: 'MOD-OFFICIAL-1',
       officialOrgName: 'Ministry of Defence',
+      officialWebsiteUrl: 'https://mod.gov.in',
       isOrgVerified: true,
       isWebsiteGovDomain: false,
       isWebsiteInOfficialList: false,
@@ -286,7 +296,7 @@ function mockAnalysisFallback(params: any) {
   };
 }
 
-function getMockHistoryList(): AnalysisRecordItem[] {
+export function getMockHistoryList(): AnalysisRecordItem[] {
   return [
     { id: 'hist-1', title: 'Ministry of Defence Recruitment Notice', inputType: 'PDF', trustScore: 18, riskLevel: 'CRITICAL_SCAM', status: 'COMPLETED', createdAt: '2026-09-06T10:15:00Z' },
     { id: 'hist-2', title: 'Railway Recruitment Board Security Guard', inputType: 'TEXT', trustScore: 28, riskLevel: 'HIGH_RISK', status: 'COMPLETED', createdAt: '2026-09-05T16:30:00Z' },

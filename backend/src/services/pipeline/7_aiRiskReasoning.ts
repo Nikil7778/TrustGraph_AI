@@ -13,6 +13,16 @@ export function runAIRiskReasoning(
   const isOrgProvided = norm.organization.raw && norm.organization.raw !== 'Unspecified / Unknown Organization';
   const isWebProvided = norm.website.normalizedDomain && norm.website.normalizedDomain !== 'not provided';
   const isEmailProvided = norm.email.raw && norm.email.raw !== 'Not Provided';
+  const evidenceCoverage = [
+    isOrgProvided,
+    Boolean(norm.notificationId.normalized && norm.notificationId.normalized !== 'NOT PROVIDED'),
+    Boolean(isWebProvided),
+    Boolean(isEmailProvided),
+    Boolean(norm.phone.normalized && norm.phone.normalized !== 'Not Provided'),
+    Boolean(norm.payment.upiId && norm.payment.upiId !== 'Not Provided'),
+    norm.payment.applicationFee !== null && norm.payment.applicationFee !== undefined
+  ].filter(Boolean).length;
+  const confidenceScore = Math.round((evidenceCoverage / 7) * 100);
 
   chainOfThought.push(`Analyzed submitted content (${isOrgProvided ? norm.organization.raw : 'Unspecified Entity'}).`);
 
@@ -31,7 +41,7 @@ export function runAIRiskReasoning(
       redFlags,
       anomaliesIdentified: anomalies,
       chainOfThought,
-      confidenceScore: 99.0
+      confidenceScore
     };
   }
 
@@ -99,7 +109,7 @@ export function runAIRiskReasoning(
     redFlags,
     anomaliesIdentified: anomalies,
     chainOfThought,
-    confidenceScore: 96.5
+    confidenceScore
   };
 }
 

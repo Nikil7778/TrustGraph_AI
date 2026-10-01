@@ -1,54 +1,37 @@
+import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Seeding TRUST AI Database...');
+  console.log('Seeding JobGuard development data...');
+  const userPasswordHash = await bcrypt.hash('password123', 12);
+  const adminPassword = process.env.ADMIN_PASSWORD || (process.env.NODE_ENV === 'production' ? '' : 'codecrafters');
+  if (!adminPassword) throw new Error('Set ADMIN_PASSWORD before seeding in production.');
+  const adminPasswordHash = await bcrypt.hash(adminPassword, 12);
 
-  // Clean existing
-  await prisma.officialRegistry.deleteMany({});
-  await prisma.knownSuspiciousFingerprint.deleteMany({});
-  await prisma.systemWeights.deleteMany({});
-  await prisma.analysisRecord.deleteMany({});
-  await prisma.user.deleteMany({});
-
-  // 0. Seed Users
-  const userPasswordHash = await bcrypt.hash('password123', 10);
-  const adminPasswordHash = await bcrypt.hash('admin123', 10);
-
-  const userA = await prisma.user.create({
-    data: {
-      name: 'User A',
-      email: 'userA@example.com',
-      password: userPasswordHash,
-      role: 'USER'
-    }
+  const userA = await prisma.user.upsert({
+    where: { usernameNormalized: 'usera' },
+    update: {},
+    create: { username: 'userA', usernameNormalized: 'usera', passwordHash: userPasswordHash, role: 'USER' }
   });
-
-  const userB = await prisma.user.create({
-    data: {
-      name: 'User B',
-      email: 'userB@example.com',
-      password: userPasswordHash,
-      role: 'USER'
-    }
+  const userB = await prisma.user.upsert({
+    where: { usernameNormalized: 'userb' },
+    update: {},
+    create: { username: 'userB', usernameNormalized: 'userb', passwordHash: userPasswordHash, role: 'USER' }
   });
-
-  const adminUser = await prisma.user.create({
-    data: {
-      name: 'System Admin',
-      email: 'admin@example.com',
-      password: adminPasswordHash,
-      role: 'ADMIN'
-    }
+  await prisma.user.upsert({
+    where: { usernameNormalized: 'admin' },
+    update: process.env.ADMIN_PASSWORD ? { passwordHash: adminPasswordHash, role: 'ADMIN' } : {},
+    create: { username: 'admin', usernameNormalized: 'admin', passwordHash: adminPasswordHash, role: 'ADMIN' }
   });
-
-  console.log('👤 Created Users: User A (userA@example.com), User B (userB@example.com), Admin (admin@example.com)');
 
   // 1. System Weights
-  await prisma.systemWeights.create({
-    data: {
+  await prisma.systemWeights.upsert({
+    where: { id: 'default_weights' },
+    update: {},
+    create: {
       id: 'default_weights',
       organizationWeight: 15.0,
       emailWeight: 15.0,
@@ -63,7 +46,7 @@ async function main() {
   });
 
   // 2. Official Registries
-  await prisma.officialRegistry.createMany({
+  if (await prisma.officialRegistry.count() === 0) await prisma.officialRegistry.createMany({
     data: [
       {
         organizationName: 'Ministry of Defence',
@@ -105,7 +88,7 @@ async function main() {
   });
 
   // 3. Known Suspicious Fingerprints
-  await prisma.knownSuspiciousFingerprint.createMany({
+  if (await prisma.knownSuspiciousFingerprint.count() === 0) await prisma.knownSuspiciousFingerprint.createMany({
     data: [
       {
         id: 'RF-10245',
@@ -158,7 +141,8 @@ async function main() {
     ]
   });
 
-  // Seed sample initial user analyses for User A & User B
+  // Add demo history only when the database has no analysis records.
+  if (await prisma.analysisRecord.count() === 0) {
   await prisma.analysisRecord.create({
     data: {
       userId: userA.id,
@@ -215,8 +199,9 @@ async function main() {
       explainableResult: JSON.stringify({})
     }
   });
+  }
 
-  console.log('✅ Database seeded successfully!');
+  console.log('Development data is ready.');
 }
 
 main()
