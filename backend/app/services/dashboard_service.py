@@ -53,9 +53,15 @@ class DashboardService:
         if not role:
             raise ValueError(f"Role with ID {target_role_id} not found.")
 
-        # All available roles for subtle role switcher
-        all_roles_db = db.query(Role).all()
-        all_roles = [RoleOption(id=r.id, name=r.name) for r in all_roles_db]
+        # Supported roles for switcher (Data Scientist, Python Developer, Data Analyst)
+        supported_role_ids = [2, 5, 1]
+        if target_role_id not in supported_role_ids:
+            supported_role_ids.append(target_role_id)
+
+        all_roles_db = db.query(Role).filter(Role.id.in_(supported_role_ids)).all()
+        order_map = {2: 1, 5: 2, 1: 3}
+        all_roles_db.sort(key=lambda r: order_map.get(r.id, 99))
+        all_roles = [RoleOption(id=r.id, name=r.name, description=r.description) for r in all_roles_db]
 
         # 1. Fetch live deterministic engine outputs
         dna_list = skill_dna_service.get_user_skill_dna(db, user_id)

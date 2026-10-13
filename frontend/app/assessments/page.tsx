@@ -1,34 +1,33 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppShell } from '../../components/AppShell';
+import { useLearner } from '../../context/LearnerContext';
 import { AssessmentCard } from '../../components/AssessmentCard';
 import { api, ApiAssessment, ApiAssessmentAttempt } from '../../services/api';
 import { MOCK_ASSESSMENTS } from '../../lib/mockData';
 import { AssessmentData } from '../../types';
-import { FileCheck2, Filter, Award, History, AlertCircle, RefreshCw } from 'lucide-react';
+import { FileCheck2, Filter, Award, History, AlertCircle, RefreshCw, Target, ArrowRight, Sparkles } from 'lucide-react';
 
 export default function AssessmentsPage() {
   const router = useRouter();
+  const { activeUserId, isDemoMode, activeUser } = useLearner();
   const [assessments, setAssessments] = useState<AssessmentData[]>([]);
   const [attempts, setAttempts] = useState<ApiAssessmentAttempt[]>([]);
   const [selectedFilter, setSelectedFilter] = useState<string>('All');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadAssessmentData();
-  }, []);
-
-  const loadAssessmentData = async () => {
+  const loadAssessmentData = useCallback(async () => {
+    if (!activeUserId) return;
     setIsLoading(true);
     setError(null);
     try {
-      // Fetch assessments and user's previous attempts (User 1 = Alex Mercer)
+      // Fetch assessments and user's previous attempts for active user
       const [apiAssessments, apiAttempts] = await Promise.all([
         api.getAssessments().catch(() => []),
-        api.getUserAssessmentAttempts(1).catch(() => []),
+        api.getUserAssessmentAttempts(activeUserId).catch(() => []),
       ]);
 
       setAttempts(apiAttempts);
@@ -59,17 +58,21 @@ export default function AssessmentsPage() {
         });
         setAssessments(mapped);
       } else {
-        // Fallback to mock data if backend returned empty array
-        setAssessments(MOCK_ASSESSMENTS);
+        // Fallback to mock data only if explicitly in demo mode
+        setAssessments(isDemoMode ? MOCK_ASSESSMENTS : []);
       }
     } catch (err: any) {
       console.error('Failed to load assessments from API:', err);
       setError(err?.message || 'Failed to load diagnostic assessments.');
-      setAssessments(MOCK_ASSESSMENTS);
+      setAssessments(isDemoMode ? MOCK_ASSESSMENTS : []);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [activeUserId, isDemoMode]);
+
+  useEffect(() => {
+    loadAssessmentData();
+  }, [loadAssessmentData]);
 
   const handleStart = (assessmentId: string) => {
     router.push(`/assessments/${assessmentId}`);
@@ -106,6 +109,37 @@ export default function AssessmentsPage() {
           <Award className="w-4 h-4 text-blue-600" />
           <span>{completedCount} / {assessments.length} Completed</span>
         </div>
+      </div>
+
+      {/* Target Goal Diagnostic Banner (Phase 1 Mandate) */}
+      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200/60 flex items-center gap-1">
+              <Target className="w-3 h-3 text-blue-600" />
+              Target Goal Assessment
+            </span>
+            <span className="text-xs font-semibold text-slate-500">
+              {activeUser?.target_role?.name || 'Selected Target Goal'}
+            </span>
+          </div>
+          <h2 className="text-base sm:text-lg font-bold text-slate-900">
+            Comprehensive Goal Diagnostic: {activeUser?.target_role?.name || 'Your Target Track'}
+          </h2>
+          <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
+            Evaluates every required competency for your target goal simultaneously. Produces your granular
+            Skill DNA profile, calculates skill gaps, and unlocks your personalized learning roadmap.
+          </p>
+        </div>
+
+        <button
+          onClick={() => router.push(`/assessments/goal/${activeUser?.target_role_id || 1}`)}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-blue-800 hover:bg-blue-900 text-white text-xs font-semibold shadow-xs transition-colors shrink-0 cursor-pointer"
+        >
+          <Sparkles className="w-4 h-4 text-blue-200" />
+          <span>Launch Goal Assessment</span>
+          <ArrowRight className="w-4 h-4" />
+        </button>
       </div>
 
       {/* Error state alert if API had issues */}

@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from app.core.database import SessionLocal, engine, Base
 from app.models.role import Role, RoleSkill
@@ -7,10 +7,13 @@ from app.models.skill import Skill
 from app.models.user import User, UserSkill
 from app.models.assessment import Assessment, AssessmentQuestion, AssessmentAttempt
 from app.models.activity import LearningActivity
+from app.models.learning import LearningModule, UserConceptProgress, LearningResource
 from app.models.evidence import SkillEvidence
 from app.models.roadmap import Roadmap, RoadmapStep
 from app.models.project import Project, ProjectAttempt
 from app.models.industry_lab import IndustryLab, IndustryLabTask, IndustryLabAttempt
+from app.seed.learning_data import LEARNING_MODULES_SEED, LEARNING_RESOURCES_SEED
+from app.seed.goal_assessment_data import PREDEFINED_GOALS, SKILL_QUESTIONS_SPEC
 
 
 def seed_database(db: Session) -> None:
@@ -23,6 +26,7 @@ def seed_database(db: Session) -> None:
         {"name": "Data Analyst", "description": "Analytic synthesis, SQL data wrangling, EDA, and executive dashboards."},
         {"name": "Data Scientist", "description": "Statistical modeling, Python predictive analytics, machine learning pipelines."},
         {"name": "ML Engineer", "description": "Production ML model deployment, MLOps, deep learning, scalable feature engineering."},
+        {"name": "Analytics Engineer", "description": "Modern data stack, SQL transformation, dbt modeling, data pipelines, and BI enablement."},
     ]
 
     role_objs = {}
@@ -45,6 +49,8 @@ def seed_database(db: Session) -> None:
         {"name": "Data Visualization", "category": "Business Intelligence & Reporting", "description": "Chart design, Matplotlib, Seaborn, and visual communication."},
         {"name": "Power BI", "category": "Business Intelligence & Reporting", "description": "DAX calculations, data modeling, executive dashboards."},
         {"name": "Machine Learning", "category": "Predictive Modeling", "description": "Supervised & unsupervised ML algorithms, model evaluation."},
+        {"name": "Deep Learning", "category": "Advanced Machine Learning", "description": "Neural network architectures, PyTorch, gradient descent, and deep models."},
+        {"name": "MLOps", "category": "Machine Learning Engineering", "description": "Production model serving, automated pipelines, monitoring, and containerization."},
     ]
 
     skill_objs = {}
@@ -57,35 +63,113 @@ def seed_database(db: Session) -> None:
             db.refresh(existing)
         skill_objs[s["name"]] = existing
 
-    # 3. Seed RoleSkills (Data Analyst benchmark)
+    # 3. Seed RoleSkills across all supported roles (Role-Correct Benchmarks)
+    # A. Data Analyst
     da_role = role_objs["Data Analyst"]
     da_benchmarks = [
+        ("SQL", 90, 85, "Critical"),
+        ("SQL JOINs", 95, 85, "Critical"),
         ("Python", 80, 80, "High"),
-        ("SQL", 85, 85, "High"),
-        ("SQL JOINs", 90, 80, "High"),
         ("Statistics", 75, 75, "Medium"),
         ("EDA", 85, 85, "High"),
-        ("Data Visualization", 80, 80, "High"),
-        ("Power BI", 75, 70, "High"),
-        ("Machine Learning", 40, 50, "Low"),
+        ("Data Visualization", 90, 85, "Critical"),
+        ("Power BI", 85, 80, "Critical"),
+        ("Machine Learning", 30, 40, "Low"),
     ]
 
-    for skill_name, importance, required_level, ind_rel in da_benchmarks:
-        skill = skill_objs[skill_name]
-        rs = db.query(RoleSkill).filter_by(role_id=da_role.id, skill_id=skill.id).first()
-        if not rs:
-            rs = RoleSkill(
-                role_id=da_role.id,
-                skill_id=skill.id,
-                importance_score=importance,
-                industry_relevance=ind_rel,
-                required_level=required_level,
-            )
-            db.add(rs)
-        else:
-            rs.importance_score = importance
-            rs.industry_relevance = ind_rel
-            rs.required_level = required_level
+    # B. Data Scientist
+    ds_role = role_objs["Data Scientist"]
+    ds_benchmarks = [
+        ("Python", 95, 85, "Critical"),
+        ("Statistics", 95, 85, "Critical"),
+        ("Machine Learning", 95, 85, "Critical"),
+        ("EDA", 85, 80, "High"),
+        ("SQL", 80, 80, "High"),
+        ("Data Visualization", 70, 75, "Medium"),
+        ("Deep Learning", 80, 75, "High"),
+        ("Power BI", 30, 40, "Low"),
+    ]
+
+    # C. ML Engineer
+    mle_role = role_objs["ML Engineer"]
+    mle_benchmarks = [
+        ("Python", 95, 90, "Critical"),
+        ("Machine Learning", 95, 90, "Critical"),
+        ("MLOps", 95, 85, "Critical"),
+        ("Deep Learning", 85, 80, "High"),
+        ("SQL", 75, 75, "Medium"),
+        ("Statistics", 75, 75, "High"),
+        ("EDA", 65, 70, "Medium"),
+        ("Data Visualization", 40, 50, "Low"),
+        ("Power BI", 20, 30, "Low"),
+    ]
+
+    # D. Analytics Engineer
+    ae_role = role_objs["Analytics Engineer"]
+    ae_benchmarks = [
+        ("SQL", 95, 90, "Critical"),
+        ("SQL JOINs", 95, 90, "Critical"),
+        ("Python", 80, 80, "High"),
+        ("EDA", 80, 80, "High"),
+        ("Data Visualization", 85, 85, "High"),
+        ("Power BI", 80, 80, "High"),
+        ("Statistics", 70, 75, "Medium"),
+        ("Machine Learning", 30, 30, "Low"),
+    ]
+
+    for role_obj, benchmarks in [(da_role, da_benchmarks), (ds_role, ds_benchmarks), (mle_role, mle_benchmarks), (ae_role, ae_benchmarks)]:
+        for skill_name, importance, required_level, ind_rel in benchmarks:
+            skill = skill_objs.get(skill_name)
+            if not skill:
+                continue
+            rs = db.query(RoleSkill).filter_by(role_id=role_obj.id, skill_id=skill.id).first()
+            if not rs:
+                rs = RoleSkill(
+                    role_id=role_obj.id,
+                    skill_id=skill.id,
+                    importance_score=importance,
+                    industry_relevance=ind_rel,
+                    required_level=required_level,
+                )
+                db.add(rs)
+            else:
+                rs.importance_score = importance
+                rs.industry_relevance = ind_rel
+    db.commit()
+
+    # 3.1 Seed Predefined Goals from PREDEFINED_GOALS specification
+    for goal in PREDEFINED_GOALS:
+        r_obj = db.query(Role).filter(Role.name == goal["name"]).first()
+        if not r_obj:
+            r_obj = Role(name=goal["name"], description=goal["description"])
+            db.add(r_obj)
+            db.commit()
+            db.refresh(r_obj)
+        role_objs[goal["name"]] = r_obj
+
+        for s_name, s_cat, s_desc, importance, req_level, ind_rel in goal["skills"]:
+            s_obj = db.query(Skill).filter(Skill.name == s_name).first()
+            if not s_obj:
+                s_obj = Skill(name=s_name, category=s_cat, description=s_desc)
+                db.add(s_obj)
+                db.commit()
+                db.refresh(s_obj)
+            skill_objs[s_name] = s_obj
+
+            rs = db.query(RoleSkill).filter_by(role_id=r_obj.id, skill_id=s_obj.id).first()
+            if not rs:
+                rs = RoleSkill(
+                    role_id=r_obj.id,
+                    skill_id=s_obj.id,
+                    importance_score=importance,
+                    industry_relevance=ind_rel,
+                    required_level=req_level,
+                )
+                db.add(rs)
+            else:
+                rs.importance_score = importance
+                rs.industry_relevance = ind_rel
+                rs.required_level = req_level
     db.commit()
 
     # 4. Seed Demo Learner (Alex Mercer)
@@ -706,6 +790,7 @@ def seed_database(db: Session) -> None:
             if not q_exists:
                 q = AssessmentQuestion(
                     assessment_id=assm.id,
+                    skill_id=assm.skill_id,
                     question_text=q_data["text"],
                     options=json.dumps(q_data["options"]),
                     correct_answer=q_data["correct"],
@@ -713,7 +798,95 @@ def seed_database(db: Session) -> None:
                     explanation=q_data["exp"],
                 )
                 db.add(q)
+            elif not q_exists.skill_id:
+                q_exists.skill_id = assm.skill_id
         db.commit()
+
+    # Seed Diagnostic Questions from SKILL_QUESTIONS_SPEC
+    for skill_name, q_list in SKILL_QUESTIONS_SPEC.items():
+        skill = skill_objs.get(skill_name)
+        if not skill:
+            continue
+        assm = db.query(Assessment).filter_by(skill_id=skill.id).first()
+        if not assm:
+            assm = Assessment(
+                title=f"{skill_name} Diagnostic Assessment",
+                description=f"Baseline technical assessment for {skill_name}.",
+                skill_id=skill.id,
+                difficulty="Intermediate",
+            )
+            db.add(assm)
+            db.commit()
+            db.refresh(assm)
+        for q_data in q_list:
+            q_exists = db.query(AssessmentQuestion).filter_by(
+                assessment_id=assm.id, question_text=q_data["text"]
+            ).first()
+            if not q_exists:
+                q = AssessmentQuestion(
+                    assessment_id=assm.id,
+                    skill_id=skill.id,
+                    question_text=q_data["text"],
+                    options=json.dumps(q_data["options"]),
+                    correct_answer=q_data["correct"],
+                    difficulty=q_data["diff"],
+                    explanation=q_data["exp"],
+                )
+                db.add(q)
+            elif not q_exists.skill_id:
+                q_exists.skill_id = skill.id
+    db.commit()
+
+    # Backfill skill_id for all existing questions
+    all_qs = db.query(AssessmentQuestion).all()
+    for q in all_qs:
+        if not q.skill_id and q.assessment and q.assessment.skill_id:
+            q.skill_id = q.assessment.skill_id
+    db.commit()
+
+    # Seed Goal Initial Diagnostic Assessments for each predefined goal
+    for goal in PREDEFINED_GOALS:
+        r_obj = role_objs.get(goal["name"])
+        if not r_obj:
+            continue
+        first_skill_name = goal["skills"][0][0]
+        first_skill = skill_objs.get(first_skill_name)
+        first_skill_id = first_skill.id if first_skill else 1
+
+        goal_assm = db.query(Assessment).filter_by(role_id=r_obj.id).first()
+        if not goal_assm:
+            goal_assm = Assessment(
+                title=f"{r_obj.name} Initial Assessment",
+                description=f"Comprehensive diagnostic baseline assessment evaluating the technical competencies required for {r_obj.name}.",
+                skill_id=first_skill_id,
+                role_id=r_obj.id,
+                difficulty="Intermediate",
+            )
+            db.add(goal_assm)
+            db.commit()
+            db.refresh(goal_assm)
+
+        # Attach 1-2 representative questions per required skill
+        existing_gq_texts = {gq.question_text for gq in goal_assm.questions}
+        for s_name, _, _, _, _, _ in goal["skills"]:
+            s_obj = skill_objs.get(s_name)
+            if not s_obj:
+                continue
+            skill_qs = db.query(AssessmentQuestion).filter(AssessmentQuestion.skill_id == s_obj.id).all()
+            for sq in skill_qs[:2]:
+                if sq.question_text not in existing_gq_texts:
+                    new_gq = AssessmentQuestion(
+                        assessment_id=goal_assm.id,
+                        skill_id=s_obj.id,
+                        question_text=sq.question_text,
+                        options=sq.options,
+                        correct_answer=sq.correct_answer,
+                        difficulty=sq.difficulty,
+                        explanation=sq.explanation,
+                    )
+                    db.add(new_gq)
+                    existing_gq_texts.add(sq.question_text)
+    db.commit()
 
     # 7. Seed Initial Evidence Audit Log
     evidences_data = [
@@ -868,6 +1041,87 @@ def seed_database(db: Session) -> None:
         db.add(lab2)
         db.commit()
 
+    # 11. Seed Modular Learning Units (Phase 19)
+    for mod_data in LEARNING_MODULES_SEED:
+        skill = skill_objs.get(mod_data["skill_name"])
+        if not skill:
+            continue
+        existing_mod = db.query(LearningModule).filter_by(slug=mod_data["slug"]).first()
+        if not existing_mod:
+            new_mod = LearningModule(
+                slug=mod_data["slug"],
+                skill_id=skill.id,
+                title=mod_data["title"],
+                concept_name=mod_data["concept_name"],
+                difficulty=mod_data["difficulty"],
+                estimated_minutes=mod_data["estimated_minutes"],
+                order_index=mod_data["order_index"],
+                prerequisite_concept_slugs=mod_data.get("prerequisite_concept_slugs"),
+                target_role_name=mod_data.get("target_role_name", "All"),
+                learning_objectives=json.dumps(mod_data["learning_objectives"]),
+                explanation=mod_data["explanation"],
+                key_rules=mod_data.get("key_rules"),
+                common_mistakes=mod_data.get("common_mistakes"),
+                worked_example=json.dumps(mod_data["worked_example"]),
+                guided_practice=json.dumps(mod_data["guided_practice"]),
+                independent_practice=json.dumps(mod_data["independent_practice"]),
+                concept_check=json.dumps(mod_data["concept_check"]),
+                passing_threshold=75.0,
+                applied_task=json.dumps(mod_data["applied_task"]),
+            )
+            db.add(new_mod)
+        else:
+            existing_mod.title = mod_data["title"]
+            existing_mod.concept_name = mod_data["concept_name"]
+            existing_mod.target_role_name = mod_data.get("target_role_name", "All")
+            existing_mod.difficulty = mod_data["difficulty"]
+            existing_mod.estimated_minutes = mod_data["estimated_minutes"]
+            existing_mod.order_index = mod_data["order_index"]
+            existing_mod.prerequisite_concept_slugs = mod_data.get("prerequisite_concept_slugs")
+            existing_mod.learning_objectives = json.dumps(mod_data["learning_objectives"])
+            existing_mod.explanation = mod_data["explanation"]
+            existing_mod.key_rules = mod_data.get("key_rules")
+            existing_mod.common_mistakes = mod_data.get("common_mistakes")
+            existing_mod.worked_example = json.dumps(mod_data["worked_example"])
+            existing_mod.concept_check = json.dumps(mod_data["concept_check"])
+            existing_mod.guided_practice = json.dumps(mod_data["guided_practice"])
+            existing_mod.independent_practice = json.dumps(mod_data["independent_practice"])
+            existing_mod.applied_task = json.dumps(mod_data["applied_task"])
+    db.commit()
+
+    # 12. Seed Authoritative External Learning Resources Registry (Phase 20)
+    for res_data in LEARNING_RESOURCES_SEED:
+        skill = skill_objs.get(res_data["skill_name"])
+        existing_res = db.query(LearningResource).filter_by(url=res_data["url"]).first()
+        if not existing_res:
+            new_res = LearningResource(
+                title=res_data["title"],
+                provider=res_data["provider"],
+                url=res_data["url"],
+                skill_id=skill.id if skill else None,
+                concept_slug=res_data["concept_slug"],
+                role_name=res_data.get("role_name", "All"),
+                difficulty=res_data.get("difficulty", "Intermediate"),
+                resource_type=res_data.get("resource_type", "Official Documentation"),
+                estimated_minutes=res_data.get("estimated_minutes", 20),
+                quality_rank=res_data.get("quality_rank", 1),
+                is_active=res_data.get("is_active", True),
+            )
+            db.add(new_res)
+        else:
+            existing_res.title = res_data["title"]
+            existing_res.provider = res_data["provider"]
+            existing_res.concept_slug = res_data["concept_slug"]
+            existing_res.role_name = res_data.get("role_name", "All")
+            existing_res.quality_rank = res_data.get("quality_rank", 1)
+            if skill:
+                existing_res.skill_id = skill.id
+    db.commit()
+
+    # Initialize Alex Mercer demo baseline progress
+    reset_alex_mercer(db)
+    seed_presentation_learner(db)
+
 
 def reset_alex_mercer(db: Session) -> None:
     """
@@ -877,10 +1131,50 @@ def reset_alex_mercer(db: Session) -> None:
     if not alex:
         return
 
+    # Sync module definitions
+    for mod_data in LEARNING_MODULES_SEED:
+        m = db.query(LearningModule).filter_by(slug=mod_data["slug"]).first()
+        if m:
+            m.concept_check = json.dumps(mod_data["concept_check"])
+            m.guided_practice = json.dumps(mod_data["guided_practice"])
+            m.independent_practice = json.dumps(mod_data["independent_practice"])
+
     # Delete non-seed assessment attempts, project attempts, and lab attempts
     db.query(AssessmentAttempt).filter_by(user_id=alex.id).delete()
     db.query(ProjectAttempt).filter_by(user_id=alex.id).delete()
     db.query(IndustryLabAttempt).filter_by(user_id=alex.id).delete()
+
+    # Reset concept progress for Alex Mercer
+    db.query(UserConceptProgress).filter_by(user_id=alex.id).delete()
+    all_mods = db.query(LearningModule).all()
+    mod_map = {m.slug: m for m in all_mods}
+
+    alex_progress_init = [
+        ("sql-fundamentals", "MASTERED", 85.0, 90.0, True),
+        ("python-pandas-pipelines", "MASTERED", 90.0, 95.0, True),
+        ("statistics-hypothesis-testing", "MASTERED", 80.0, 85.0, True),
+        ("sql-joins-mastery", "REMEDIATION", 45.0, 42.0, False),  # Critical debt
+        ("eda-workflow-data-profiling", "AVAILABLE", 0.0, 0.0, False),
+        ("machine-learning-foundations", "LOCKED", 0.0, 0.0, False),
+    ]
+
+    for slug, p_status, p_score, c_score, c_passed in alex_progress_init:
+        m = mod_map.get(slug)
+        if m:
+            p_rec = UserConceptProgress(
+                user_id=alex.id,
+                module_id=m.id,
+                concept_slug=slug,
+                status=p_status,
+                practice_score=p_score,
+                concept_check_score=c_score,
+                concept_check_passed=c_passed,
+                guided_practice_completed=c_passed,
+                independent_practice_completed=c_passed,
+                mastered_at=datetime.utcnow() if c_passed else None,
+            )
+            db.add(p_rec)
+    db.commit()
 
     seed_sources = [
         "Diagnostic Assessment #2", "Practice Lab Module #4",
@@ -916,6 +1210,179 @@ def reset_alex_mercer(db: Session) -> None:
 
     from app.services.roadmap_service import roadmap_service
     roadmap_service.rebuild_user_roadmap(db, alex.id)
+    db.commit()
+
+
+def seed_presentation_learner(db: Session) -> None:
+    """
+    Seeds official presentation learner NIKIL_A (nikila.2509@gmail.com).
+    Configured with a realistic halfway-completed learning journey:
+    - Target Role: Analytics Engineer
+    - Diagnostic assessment completed across core competencies
+    - Skill DNA populated with strengths (Python, Statistics, SQL) and developing areas
+    - Meaningful active Skill Debt on SQL JOINs (High severity)
+    - Next-Best-Proof recommending SQL JOIN Rescue Practice
+    - Modular Learning: SQL, Python, Stats mastered; SQL JOINs in remediation; EDA available
+    - Practice & Applied Evidence (e.g. E-Commerce Return Rates Audit Lab)
+    - Dynamic roadmap actively in progress with locked and available steps
+    """
+    ae_role = db.query(Role).filter(Role.name == "Analytics Engineer").first()
+    if not ae_role:
+        ae_role = Role(
+            name="Analytics Engineer",
+            description="Modern data stack, SQL transformation, dbt modeling, data pipelines, and BI enablement.",
+        )
+        db.add(ae_role)
+        db.commit()
+        db.refresh(ae_role)
+
+    nikil = db.query(User).filter(User.email == "nikila.2509@gmail.com").first()
+    if not nikil:
+        nikil = User(
+            name="NIKIL_A",
+            email="nikila.2509@gmail.com",
+            experience_level="Intermediate",
+            target_role_id=ae_role.id,
+            weekly_learning_hours=8,
+            learning_goal="Get my first Data/AI job",
+        )
+        db.add(nikil)
+        db.commit()
+        db.refresh(nikil)
+    else:
+        nikil.name = "NIKIL_A"
+        nikil.target_role_id = ae_role.id
+        nikil.experience_level = "Intermediate"
+        nikil.weekly_learning_hours = 8
+        nikil.learning_goal = "Get my first Data/AI job"
+        db.commit()
+
+    now = datetime.utcnow()
+    yesterday = now - timedelta(days=1)
+    two_days_ago = now - timedelta(days=2)
+
+    # 1. Reset Concept Progress
+    db.query(UserConceptProgress).filter_by(user_id=nikil.id).delete()
+    all_mods = db.query(LearningModule).all()
+    mod_map = {m.slug: m for m in all_mods}
+
+    nikil_progress = [
+        ("sql-fundamentals", "MASTERED", 88.0, 92.0, True, two_days_ago),
+        ("python-pandas-pipelines", "MASTERED", 90.0, 95.0, True, yesterday),
+        ("statistics-hypothesis-testing", "MASTERED", 82.0, 85.0, True, yesterday),
+        ("sql-joins-mastery", "REMEDIATION", 45.0, 42.0, False, None),
+        ("eda-workflow-data-profiling", "AVAILABLE", 0.0, 0.0, False, None),
+        ("machine-learning-foundations", "LOCKED", 0.0, 0.0, False, None),
+    ]
+
+    for slug, p_status, p_score, c_score, c_passed, m_date in nikil_progress:
+        m = mod_map.get(slug)
+        if m:
+            p_rec = UserConceptProgress(
+                user_id=nikil.id,
+                module_id=m.id,
+                concept_slug=slug,
+                status=p_status,
+                practice_score=p_score,
+                concept_check_score=c_score,
+                concept_check_passed=c_passed,
+                guided_practice_completed=c_passed or (slug == "sql-joins-mastery"),
+                independent_practice_completed=c_passed,
+                mastered_at=m_date,
+            )
+            db.add(p_rec)
+    db.commit()
+
+    # 2. Reset Assessment Attempts
+    db.query(AssessmentAttempt).filter_by(user_id=nikil.id).delete()
+    attempts_data = [
+        (2, 85.0, 88.0, two_days_ago),  # Python
+        (3, 78.0, 80.0, two_days_ago),  # SQL
+        (4, 82.0, 85.0, yesterday),     # Statistics
+        (1, 45.0, 42.0, yesterday),     # SQL JOINs (weak attempt)
+        (5, 65.0, 68.0, yesterday),     # EDA
+        (6, 70.0, 72.0, yesterday),     # Data Visualization
+    ]
+    for assm_id, score, acc, dt in attempts_data:
+        att = AssessmentAttempt(
+            user_id=nikil.id,
+            assessment_id=assm_id,
+            score=score,
+            accuracy=acc,
+            completed_at=dt,
+        )
+        db.add(att)
+    db.commit()
+
+    # 3. Reset and Seed Evidence Audit Log
+    db.query(SkillEvidence).filter_by(user_id=nikil.id).delete()
+    evidence_items = [
+        ("Python", "Diagnostic Assessment #2", "ASSESSMENT", 88.0, "Verified Python data manipulation proficiency.", two_days_ago),
+        ("Python", "Pandas Pipeline Lab Module", "PRACTICE_LAB", 90.0, "Automated data transformation script executed successfully.", yesterday),
+        ("SQL", "Diagnostic Assessment #3", "ASSESSMENT", 80.0, "Demonstrated relational filtering and aggregation syntax.", two_days_ago),
+        ("SQL", "Relational Query Practice Lab", "PRACTICE_LAB", 82.0, "Passed group by and CTE query execution tests.", yesterday),
+        ("SQL JOINs", "Diagnostic Assessment #1", "ASSESSMENT", 42.0, "Sub-optimal multi-table join filtering and NULL handling.", yesterday),
+        ("SQL JOINs", "Relational Join Quiz Attempt", "PRACTICE_LAB", 45.0, "Attempted inner and left join edge-case challenges.", yesterday),
+        ("Statistics", "Diagnostic Assessment #4", "ASSESSMENT", 85.0, "Demonstrated hypothesis testing and statistical analysis.", yesterday),
+        ("EDA", "Diagnostic Assessment #5", "ASSESSMENT", 68.0, "Completed exploratory data distributions and missing value treatment.", yesterday),
+        ("Data Visualization", "Diagnostic Assessment #6", "ASSESSMENT", 72.0, "Verified chart design and executive visualization principles.", yesterday),
+        ("Power BI", "DAX Calculations Quiz", "ASSESSMENT", 75.0, "Introductory DAX measure calculations.", yesterday),
+        ("Power BI", "Power BI Executive Dashboard Lab", "PRACTICE_LAB", 78.0, "Constructed interactive dimensional executive report.", yesterday),
+        ("SQL", "E-Commerce Return Rates Audit Lab", "APPLIED_LAB", 84.0, "Real-world applied dimensional analysis for e-commerce return metrics.", yesterday),
+    ]
+    for skill_name, source, ev_type, score, details, dt in evidence_items:
+        s = db.query(Skill).filter_by(name=skill_name).first()
+        if s:
+            ev = SkillEvidence(
+                user_id=nikil.id,
+                skill_id=s.id,
+                source=source,
+                evidence_type=ev_type,
+                score=score,
+                description=details,
+                created_at=dt,
+            )
+            db.add(ev)
+    db.commit()
+
+    # 4. UserSkills (Skill DNA)
+    nikil_dna_scores = [
+        ("Python", 85.0, 90.0, 88.0, 2),
+        ("SQL", 78.0, 82.0, 76.0, 3),
+        ("SQL JOINs", 42.0, 45.0, 40.0, 2),  # Active weak skill
+        ("Statistics", 80.0, 82.0, 80.0, 1),
+        ("EDA", 68.0, 70.0, 66.0, 1),
+        ("Data Visualization", 74.0, 76.0, 72.0, 1),
+        ("Power BI", 76.0, 78.0, 75.0, 2),
+        ("Machine Learning", 30.0, 32.0, 28.0, 0),
+    ]
+
+    for s_name, level, conf, acc, ev_count in nikil_dna_scores:
+        skill = db.query(Skill).filter_by(name=s_name).first()
+        if skill:
+            us = db.query(UserSkill).filter_by(user_id=nikil.id, skill_id=skill.id).first()
+            if not us:
+                us = UserSkill(
+                    user_id=nikil.id,
+                    skill_id=skill.id,
+                    skill_level=level,
+                    confidence=conf,
+                    accuracy=acc,
+                    evidence_score=ev_count * 10.0,
+                    last_assessed_at=yesterday,
+                )
+                db.add(us)
+            else:
+                us.skill_level = level
+                us.confidence = conf
+                us.accuracy = acc
+                us.evidence_score = ev_count * 10.0
+                us.last_assessed_at = yesterday
+    db.commit()
+
+    # 5. Dynamic Roadmap Rebuild
+    from app.services.roadmap_service import roadmap_service
+    roadmap_service.rebuild_user_roadmap(db, nikil.id, ae_role.id)
     db.commit()
 
 

@@ -10,7 +10,10 @@ from app.schemas.assessment import (
     AssessmentAttemptCreate,
     AssessmentAttemptResponse,
     AssessmentResultResponse,
+    GoalAssessmentSubmission,
+    GoalAssessmentResultResponse,
 )
+
 
 router = APIRouter()
 
@@ -85,3 +88,52 @@ def submit_assessment_attempt(
             "accuracy": attempt.accuracy,
             "completed_at": attempt.completed_at,
         }
+
+
+@router.get("/assessments/goal/{role_id}", response_model=AssessmentDetailResponse, tags=["Assessments"])
+def get_goal_assessment(role_id: int, db: Session = Depends(get_db)):
+    """
+    Retrieve or initialize the diagnostic assessment for a career target goal.
+    Returns 10-25 questions sanitized without correct answers or explanations before submission.
+    """
+    try:
+        assessment = assessment_service.get_or_create_goal_assessment(db, role_id)
+        if assessment.skill:
+            assessment.skill_name = assessment.skill.name
+        assessment.question_count = len(assessment.questions)
+        for q in assessment.questions:
+            if q.skill:
+                q.skill_name = q.skill.name
+        return assessment
+    except ValueError as val_err:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(val_err),
+        )
+
+
+@router.post(
+    "/assessments/goal/submit",
+    response_model=GoalAssessmentResultResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["Assessments"],
+)
+def submit_goal_assessment(payload: GoalAssessmentSubmission, db: Session = Depends(get_db)):
+    """
+    Submit initial diagnostic assessment for a target goal.
+    Calculates granular skill-level scores across all competencies, generates Skill DNA evidence,
+    computes skill gaps (Strong, Moderate, Weak, Missing), and provides the next recommended action.
+    """
+    try:
+        return assessment_service.submit_goal_assessment(db, payload)
+    except ValueError as val_err:
+        msg = str(val_err)
+        if "not found" in msg.lower():
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=msg)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
+    except Exception as err:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to process goal assessment submission: {str(err)}",
+        )
+

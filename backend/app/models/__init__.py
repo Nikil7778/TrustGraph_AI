@@ -4,10 +4,12 @@ from app.models.skill import Skill
 from app.models.user import User, UserSkill
 from app.models.assessment import Assessment, AssessmentQuestion, AssessmentAttempt
 from app.models.activity import LearningActivity
+from app.models.learning import LearningModule, UserConceptProgress, LearningResource
 from app.models.evidence import SkillEvidence
 from app.models.roadmap import Roadmap, RoadmapStep, RoadmapChange
 from app.models.project import Project, ProjectAttempt
 from app.models.industry_lab import IndustryLab, IndustryLabTask, IndustryLabAttempt
+from app.models.ml_prediction import MLPrediction
 
 __all__ = [
     "Base",
@@ -20,6 +22,9 @@ __all__ = [
     "AssessmentQuestion",
     "AssessmentAttempt",
     "LearningActivity",
+    "LearningModule",
+    "UserConceptProgress",
+    "LearningResource",
     "SkillEvidence",
     "Roadmap",
     "RoadmapStep",
@@ -29,5 +34,6 @@ __all__ = [
     "IndustryLab",
     "IndustryLabTask",
     "IndustryLabAttempt",
+    "MLPrediction",
 ]
 

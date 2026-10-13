@@ -1,10 +1,12 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { AppShell } from '../../components/AppShell';
+import { useLearner } from '../../context/LearnerContext';
 import { useCoach } from '../../context/CoachContext';
 import { api, ApiSkillDNA, ApiAILearningExplanationResponse } from '../../services/api';
+import { NextProofReadiness } from '../../components/NextProofReadiness';
 import {
   Code2,
   Table,
@@ -25,6 +27,7 @@ import {
 } from 'lucide-react';
 
 export default function SkillDNAPage() {
+  const { activeUserId } = useLearner();
   const { openCoach } = useCoach();
   const [skillDnaList, setSkillDnaList] = useState<ApiSkillDNA[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -36,15 +39,12 @@ export default function SkillDNAPage() {
   const [aiExplanation, setAiExplanation] = useState<ApiAILearningExplanationResponse | null>(null);
   const [isLoadingAi, setIsLoadingAi] = useState<boolean>(false);
 
-  useEffect(() => {
-    loadSkillDna();
-  }, []);
-
-  const loadSkillDna = async () => {
+  const loadSkillDna = useCallback(async () => {
+    if (!activeUserId) return;
     setIsLoading(true);
     setError(null);
     try {
-      const data = await api.getSkillDna(1);
+      const data = await api.getSkillDna(activeUserId);
       setSkillDnaList(data);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to load Skill DNA vector.';
@@ -53,12 +53,17 @@ export default function SkillDNAPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [activeUserId]);
+
+  useEffect(() => {
+    loadSkillDna();
+  }, [loadSkillDna]);
 
   const handleRecalculate = async () => {
+    if (!activeUserId) return;
     setIsRecalculating(true);
     try {
-      const updated = await api.recalculateSkillDna(1);
+      const updated = await api.recalculateSkillDna(activeUserId);
       if (updated && updated.length > 0) {
         setSkillDnaList(updated);
       }
@@ -172,23 +177,25 @@ export default function SkillDNAPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {skillDnaList.map((skill) => {
-                  const isDebt =
-                    skill.status === 'CRITICAL' ||
-                    skill.skill_name.toLowerCase().includes('join');
+                  const isUnassessedSkill = skill.evidence_count === 0 || skill.status === 'UNKNOWN';
+                  const isDebt = !isUnassessedSkill && skill.status === 'CRITICAL';
                   const { domain, icon: Icon } = getSkillMeta(
                     skill.skill_name,
                     skill.skill_category
                   );
 
                   // Confidence dot styling
-                  const confidenceLabel =
-                    skill.confidence >= 75
-                      ? 'High'
-                      : skill.confidence >= 50
-                      ? 'Medium'
-                      : 'Low';
+                  const confidenceLabel = isUnassessedSkill
+                    ? 'Not assessed'
+                    : skill.confidence >= 75
+                    ? 'High'
+                    : skill.confidence >= 50
+                    ? 'Medium'
+                    : 'Low';
 
-                  const confidenceDotClass = isDebt
+                  const confidenceDotClass = isUnassessedSkill
+                    ? 'bg-slate-300'
+                    : isDebt
                     ? 'bg-rose-600'
                     : confidenceLabel === 'High'
                     ? 'bg-emerald-600'
@@ -201,7 +208,10 @@ export default function SkillDNAPage() {
                   let statusBadgeClass =
                     'bg-indigo-50 text-indigo-700 border border-indigo-200/60';
 
-                  if (isDebt) {
+                  if (isUnassessedSkill) {
+                    statusLabel = 'Not assessed';
+                    statusBadgeClass = 'bg-slate-100 text-slate-600 border border-slate-200';
+                  } else if (isDebt) {
                     statusLabel = 'Skill Debt';
                     statusBadgeClass = 'bg-rose-700 text-white font-semibold';
                   } else if (skill.skill_level >= 75) {
@@ -265,15 +275,19 @@ export default function SkillDNAPage() {
                                   ? 'bg-blue-900'
                                   : 'bg-blue-600'
                               }`}
-                              style={{ width: `${Math.round(skill.skill_level)}%` }}
+                              style={{ width: isUnassessedSkill ? '0%' : `${Math.round(skill.skill_level)}%` }}
                             />
                           </div>
                           <span
                             className={`font-bold font-mono text-[11px] shrink-0 ${
-                              isDebt ? 'text-rose-600' : 'text-slate-900'
+                              isUnassessedSkill
+                                ? 'text-slate-500 font-normal'
+                                : isDebt
+                                ? 'text-rose-600'
+                                : 'text-slate-900'
                             }`}
                           >
-                            {Math.round(skill.skill_level)}%
+                            {isUnassessedSkill ? 'Not assessed' : `${Math.round(skill.skill_level)}%`}
                           </span>
                         </div>
                       </td>
@@ -354,40 +368,56 @@ export default function SkillDNAPage() {
 
               <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto text-xs">
                 {/* Metrics Breakdown */}
-                <div className="grid grid-cols-2 gap-3 p-3 rounded-lg bg-slate-50 border border-slate-200">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3 rounded-lg bg-slate-50 border border-slate-200">
                   <div>
-                    <span className="text-[10px] text-slate-400 uppercase font-bold block">
-                      Demonstrated Level
+                    <span className="text-[10px] text-slate-500 uppercase font-bold block">
+                      Skill Level
                     </span>
-                    <span className="text-base font-bold text-slate-900">
-                      {Math.round(inspectedSkill.skill_level)}%
+                    <span className="text-base font-bold text-slate-900 font-mono">
+                      {inspectedSkill.evidence_count === 0 || inspectedSkill.status === 'UNKNOWN'
+                        ? 'Not assessed'
+                        : `${Math.round(inspectedSkill.skill_level)}%`}
                     </span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-400 uppercase font-bold block">
+                    <span className="text-[10px] text-slate-500 uppercase font-bold block">
                       Confidence
                     </span>
-                    <span className="text-base font-bold text-slate-900">
-                      {Math.round(inspectedSkill.confidence)}%
+                    <span className="text-base font-bold text-slate-900 font-mono">
+                      {inspectedSkill.evidence_count === 0 || inspectedSkill.status === 'UNKNOWN'
+                        ? 'Not assessed'
+                        : `${Math.round(inspectedSkill.confidence)}%`}
                     </span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-400 uppercase font-bold block">
-                      Evidence Count
+                    <span className="text-[10px] text-slate-500 uppercase font-bold block">
+                      Skill Debt
                     </span>
-                    <span className="text-base font-bold text-slate-900">
-                      {inspectedSkill.evidence_count} Artifacts
+                    <span className={`text-base font-bold ${inspectedSkill.status === 'CRITICAL' ? 'text-rose-600' : 'text-slate-800'}`}>
+                      {inspectedSkill.evidence_count === 0 || inspectedSkill.status === 'UNKNOWN'
+                        ? 'None'
+                        : inspectedSkill.status === 'CRITICAL'
+                        ? 'HIGH'
+                        : 'HEALTHY'}
                     </span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-400 uppercase font-bold block">
-                      Recency
+                    <span className="text-[10px] text-slate-500 uppercase font-bold block">
+                      Career Priority
                     </span>
-                    <span className="text-xs font-semibold text-slate-700 mt-1 block">
-                      {inspectedSkill.recency_label || 'Current'}
+                    <span className="text-base font-bold text-slate-800">
+                      {inspectedSkill.skill_name.toLowerCase().includes('sql') || inspectedSkill.skill_name.toLowerCase().includes('python') ? 'HIGH' : 'MEDIUM'}
                     </span>
                   </div>
                 </div>
+
+                {/* Section 3: Next-Proof Readiness (Supporting ML Predictive Advisory) */}
+                <NextProofReadiness
+                  userId={inspectedSkill.user_id || activeUserId || 1}
+                  skillId={inspectedSkill.skill_id}
+                  skillName={inspectedSkill.skill_name}
+                  showExplainable={true}
+                />
 
                 {/* AI Concept Explanation / Guidance */}
                 {isLoadingAi ? (

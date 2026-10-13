@@ -12,9 +12,13 @@ import {
   ApiRoadmap,
   ApiProject,
   ApiSkillEvidence,
+  ApiUserCreate,
+  ApiAuthResponse,
 } from '../services/api';
 
 interface LearnerContextType {
+  isAuthenticated: boolean;
+  isAuthLoading: boolean;
   activeUserId: number;
   activeUser: ApiUser | null;
   userSkills: ApiUserSkill[];
@@ -30,6 +34,10 @@ interface LearnerContextType {
   isLoading: boolean;
   error: string | null;
   isDemoMode: boolean;
+  login: (email: string, password?: string) => Promise<ApiUser>;
+  googleLogin: (payload: { credential?: string; code?: string; redirect_uri?: string }) => Promise<ApiAuthResponse>;
+  logout: () => Promise<void>;
+  registerLearner: (payload: ApiUserCreate & { password?: string }) => Promise<ApiUser>;
   setActiveUserId: (id: number) => void;
   refreshUser: () => Promise<void>;
   rebuildRoadmap: () => Promise<void>;
@@ -49,7 +57,9 @@ const LearnerContext = createContext<LearnerContextType | undefined>(undefined);
 const DEMO_USER_ID = 1; // Alex Mercer demo profile
 
 export const LearnerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [activeUserId, setActiveUserIdState] = useState<number>(DEMO_USER_ID);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isAuthLoading, setIsAuthLoading] = useState<boolean>(true);
+  const [activeUserId, setActiveUserIdState] = useState<number>(0);
   const [activeUser, setActiveUser] = useState<ApiUser | null>(null);
   const [userSkills, setUserSkills] = useState<ApiUserSkill[]>([]);
   const [skillDnaList, setSkillDnaList] = useState<ApiSkillDNA[]>([]);
@@ -61,21 +71,78 @@ export const LearnerProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [userEvidence, setUserEvidence] = useState<ApiSkillEvidence[]>([]);
   const [projects, setProjects] = useState<ApiProject[]>([]);
   const [allUsers, setAllUsers] = useState<ApiUser[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Read stored active learner ID on mount
-  useEffect(() => {
+  const clearSessionData = useCallback(() => {
+    setIsAuthenticated(false);
+    setActiveUserIdState(0);
+    setActiveUser(null);
+    setUserSkills([]);
+    setSkillDnaList([]);
+    setSkillDebts([]);
+    setCareerValues([]);
+    setNextBestProof(null);
+    setNextBestProofCandidates([]);
+    setRoadmap(null);
+    setUserEvidence([]);
+    setProjects([]);
     if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('active_learner_id');
-      if (stored) {
-        const parsed = parseInt(stored, 10);
-        if (!isNaN(parsed)) {
-          setActiveUserIdState(parsed);
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('active_learner_id');
+    }
+  }, []);
+
+  // Check initial session on client mount
+  useEffect(() => {
+    let isMounted = true;
+    async function checkSession() {
+      try {
+        const storedToken = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+        const storedLearnerId = typeof window !== 'undefined' ? localStorage.getItem('active_learner_id') : null;
+
+        // Try resolving authenticated user via /api/auth/me
+        let resolvedUser: ApiUser | null = null;
+        try {
+          resolvedUser = await api.getMe();
+        } catch {
+          // If getMe failed, check if storedToken and storedLearnerId exist
+          if (storedToken && storedLearnerId) {
+            const parsedId = parseInt(storedLearnerId, 10);
+            if (!isNaN(parsedId) && parsedId > 0) {
+              resolvedUser = await api.getUser(parsedId).catch(() => null);
+            }
+          }
+        }
+
+        if (isMounted) {
+          if (resolvedUser && resolvedUser.id > 0) {
+            setActiveUser(resolvedUser);
+            setActiveUserIdState(resolvedUser.id);
+            setIsAuthenticated(true);
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('active_learner_id', resolvedUser.id.toString());
+            }
+          } else {
+            clearSessionData();
+          }
+        }
+      } catch {
+        if (isMounted) {
+          clearSessionData();
+        }
+      } finally {
+        if (isMounted) {
+          setIsAuthLoading(false);
         }
       }
     }
-  }, []);
+
+    checkSession();
+    return () => {
+      isMounted = false;
+    };
+  }, [clearSessionData]);
 
   const setActiveUserId = (id: number) => {
     setActiveUserIdState(id);
@@ -84,11 +151,92 @@ export const LearnerProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  const loadLearnerData = useCallback(async () => {
+  const login = async (email: string, password?: string): Promise<ApiUser> => {
     setIsLoading(true);
     setError(null);
     try {
-      // Fetch user profile, skills, dna, debt, career value, next-best-proof, roadmap, evidence, and projects
+      const res = await api.login({ email, password });
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('auth_token', res.token);
+        localStorage.setItem('active_learner_id', res.user.id.toString());
+      }
+      setActiveUserIdState(res.user.id);
+      setActiveUser(res.user);
+      setIsAuthenticated(true);
+      return res.user;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Login failed.';
+      setError(msg);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const googleLogin = async (payload: { credential?: string; code?: string; redirect_uri?: string }): Promise<ApiAuthResponse> => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await api.googleAuth(payload);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('auth_token', res.token);
+        localStorage.setItem('active_learner_id', res.user.id.toString());
+      }
+      setActiveUserIdState(res.user.id);
+      setActiveUser(res.user);
+      setIsAuthenticated(true);
+      return res;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Google sign-in failed.';
+      setError(msg);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const registerLearner = async (payload: ApiUserCreate & { password?: string }): Promise<ApiUser> => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await api.register(payload);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('auth_token', res.token);
+        localStorage.setItem('active_learner_id', res.user.id.toString());
+      }
+      setActiveUserIdState(res.user.id);
+      setActiveUser(res.user);
+      setIsAuthenticated(true);
+      return res.user;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Registration failed.';
+      setError(msg);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await api.logout().catch(() => null);
+    } finally {
+      clearSessionData();
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
+    }
+  };
+
+  const loadLearnerData = useCallback(async () => {
+    if (!isAuthenticated || !activeUserId || activeUserId <= 0) {
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    try {
       const [user, skills, dnaList, usersList, debts, cvList, nbp, nbpCandidates, userRoadmap, evidenceList, projectList] = await Promise.all([
         api.getUser(activeUserId).catch(() => null),
         api.getUserSkills(activeUserId).catch(() => []),
@@ -105,8 +253,6 @@ export const LearnerProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       if (user) {
         setActiveUser(user);
-      } else {
-        setActiveUser(null);
       }
       setUserSkills(skills);
       setSkillDnaList(dnaList);
@@ -124,11 +270,13 @@ export const LearnerProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } finally {
       setIsLoading(false);
     }
-  }, [activeUserId]);
+  }, [isAuthenticated, activeUserId]);
 
   useEffect(() => {
-    loadLearnerData();
-  }, [loadLearnerData]);
+    if (isAuthenticated && activeUserId > 0) {
+      loadLearnerData();
+    }
+  }, [isAuthenticated, activeUserId, loadLearnerData]);
 
   const completeProof = async (
     skillId: number,
@@ -137,6 +285,7 @@ export const LearnerProvider: React.FC<{ children: React.ReactNode }> = ({ child
     description: string,
     source?: string
   ) => {
+    if (!activeUserId) return;
     try {
       await api.completeProofAction(activeUserId, {
         skill_id: skillId,
@@ -153,6 +302,7 @@ export const LearnerProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const rebuildRoadmap = async () => {
+    if (!activeUserId) return;
     try {
       const updated = await api.rebuildRoadmap(activeUserId);
       setRoadmap(updated);
@@ -163,6 +313,7 @@ export const LearnerProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const updateTargetRole = async (roleId: number) => {
+    if (!activeUserId) return;
     try {
       await api.updateUser(activeUserId, { target_role_id: roleId });
       await loadLearnerData();
@@ -174,6 +325,7 @@ export const LearnerProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const submitProject = async (projectId: number, score: number, feedback?: string) => {
+    if (!activeUserId) return;
     try {
       await api.submitProjectAttempt({
         user_id: activeUserId,
@@ -181,7 +333,6 @@ export const LearnerProvider: React.FC<{ children: React.ReactNode }> = ({ child
         score,
         feedback: feedback || 'Completed portfolio project evaluation.',
       });
-      // Also register verified evidence in SkillEvidence
       const projectObj = projects.find((p) => p.id === projectId);
       if (projectObj) {
         await api.completeProofAction(activeUserId, {
@@ -204,6 +355,8 @@ export const LearnerProvider: React.FC<{ children: React.ReactNode }> = ({ child
   return (
     <LearnerContext.Provider
       value={{
+        isAuthenticated,
+        isAuthLoading,
         activeUserId,
         activeUser,
         userSkills,
@@ -219,6 +372,10 @@ export const LearnerProvider: React.FC<{ children: React.ReactNode }> = ({ child
         isLoading,
         error,
         isDemoMode,
+        login,
+        googleLogin,
+        logout,
+        registerLearner,
         setActiveUserId,
         refreshUser: loadLearnerData,
         rebuildRoadmap,

@@ -3,6 +3,7 @@
 import React, { useEffect, useState, Suspense } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { AppShell } from '../../../components/AppShell';
+import { useLearner } from '../../../context/LearnerContext';
 import {
   api,
   ApiAssessmentDetail,
@@ -30,6 +31,7 @@ import {
 function TakeAssessmentContent() {
   const params = useParams();
   const router = useRouter();
+  const { activeUserId, refreshUser } = useLearner();
   const assessmentId = Number(params?.id);
 
   const [assessment, setAssessment] = useState<ApiAssessmentDetail | null>(null);
@@ -107,12 +109,13 @@ function TakeAssessmentContent() {
 
     try {
       const resultData = await api.submitAssessment({
-        user_id: 1, // Alex Mercer demo learner
+        user_id: activeUserId || 1,
         assessment_id: assessment.id,
         answers: answersPayload,
       });
 
       setResult(resultData);
+      await refreshUser();
     } catch (err: any) {
       console.error('Failed to submit assessment attempt:', err);
       setError(err?.message || 'Failed to calculate score server-side.');

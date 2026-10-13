@@ -5,7 +5,6 @@ import { AppShell } from '../../components/AppShell';
 import { Settings, Target, Key, Database, CheckCircle2, Loader2, Save } from 'lucide-react';
 import { useLearner } from '../../context/LearnerContext';
 import { api, ApiRole } from '../../services/api';
-import { CURRENT_USER } from '../../lib/mockData';
 
 export default function SettingsPage() {
   const { activeUser, updateTargetRole, isDemoMode } = useLearner();
@@ -18,11 +17,19 @@ export default function SettingsPage() {
     async function fetchRoles() {
       try {
         const fetched = await api.getRoles();
-        setRoles(fetched);
+        const supported = [
+          fetched.find((r) => r.id === 2 || r.name === 'Data Scientist') || ({ id: 2, name: 'Data Scientist' } as ApiRole),
+          fetched.find((r) => r.id === 5 || r.name === 'Python Developer') || ({ id: 5, name: 'Python Developer' } as ApiRole),
+          fetched.find((r) => r.id === 1 || r.name === 'Data Analyst') || ({ id: 1, name: 'Data Analyst' } as ApiRole),
+        ];
+        if (activeUser?.target_role_id === 9) {
+          supported.push({ id: 9, name: 'Analytics Engineer (Preserved)' } as ApiRole);
+        }
+        setRoles(supported);
         if (activeUser?.target_role_id) {
           setSelectedRoleId(activeUser.target_role_id);
-        } else if (fetched.length > 0) {
-          setSelectedRoleId(fetched[0].id);
+        } else if (supported.length > 0) {
+          setSelectedRoleId(supported[0].id);
         }
       } catch (err) {
         console.error('Failed to fetch roles:', err);
@@ -89,6 +96,7 @@ export default function SettingsPage() {
               ) : (
                 <>
                   <option value={1}>Data Analyst</option>
+                  <option value={9}>Analytics Engineer</option>
                   <option value={2}>Data Scientist</option>
                   <option value={3}>ML Engineer</option>
                 </>

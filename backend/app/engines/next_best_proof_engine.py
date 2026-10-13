@@ -39,13 +39,19 @@ class NextBestProofEngine:
     }
 
     def check_prerequisites(
-        self, skill_name: str, skills_dna_map: Dict[str, Dict[str, Any]]
+        self, skill_name: str, skills_dna_map: Dict[str, Dict[str, Any]], role_name: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Determines whether required prerequisites for a skill are healthy.
         A prerequisite is healthy if demonstrated proficiency >= 65.0% and has evidence.
         """
-        required_prereqs = self.PREREQUISITES_MAP.get(skill_name, [])
+        if role_name:
+            from app.engines.role_curriculum import role_curriculum_engine
+            role_prereqs = role_curriculum_engine.get_prerequisite_graph_for_role(role_name)
+            required_prereqs = role_prereqs.get(skill_name, self.PREREQUISITES_MAP.get(skill_name, []))
+        else:
+            required_prereqs = self.PREREQUISITES_MAP.get(skill_name, [])
+
         if not required_prereqs:
             return {"status": "NONE", "healthy": True, "blocking": [], "prereqs": []}
 
@@ -321,7 +327,7 @@ class NextBestProofEngine:
         recent_types = [getattr(e, "evidence_type", "") for e in evidences[:3]]
 
         # Prerequisites check
-        prereq_info = self.check_prerequisites(skill_name, all_skills_dna_map)
+        prereq_info = self.check_prerequisites(skill_name, all_skills_dna_map, role_name=role_name)
 
         # Action readiness
         action_readiness = self.calculate_action_readiness(

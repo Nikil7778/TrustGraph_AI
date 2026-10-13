@@ -10,12 +10,14 @@ class Assessment(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     title = Column(String(200), nullable=False)
     description = Column(Text, nullable=True)
-    skill_id = Column(Integer, ForeignKey("skills.id", ondelete="CASCADE"), nullable=False, index=True)
+    skill_id = Column(Integer, ForeignKey("skills.id", ondelete="CASCADE"), nullable=True, index=True)
+    role_id = Column(Integer, ForeignKey("roles.id", ondelete="CASCADE"), nullable=True, index=True)
     difficulty = Column(String(50), default="Intermediate", nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     # Relationships
     skill = relationship("Skill", back_populates="assessments")
+    role = relationship("Role")
     questions = relationship("AssessmentQuestion", back_populates="assessment", cascade="all, delete-orphan")
     attempts = relationship("AssessmentAttempt", back_populates="assessment", cascade="all, delete-orphan")
 
@@ -25,6 +27,7 @@ class AssessmentQuestion(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     assessment_id = Column(Integer, ForeignKey("assessments.id", ondelete="CASCADE"), nullable=False, index=True)
+    skill_id = Column(Integer, ForeignKey("skills.id", ondelete="SET NULL"), nullable=True, index=True)
     question_text = Column(Text, nullable=False)
     options = Column(Text, nullable=False)  # Store JSON array string of options
     correct_answer = Column(String(255), nullable=False)
@@ -33,6 +36,7 @@ class AssessmentQuestion(Base):
 
     # Relationships
     assessment = relationship("Assessment", back_populates="questions")
+    skill = relationship("Skill")
 
 
 class AssessmentAttempt(Base):

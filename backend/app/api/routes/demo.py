@@ -2,6 +2,7 @@ from typing import Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from app.core.config import settings
 from app.core.database import get_db
 from app.models.user import User
 from app.models.skill import Skill
@@ -66,6 +67,12 @@ def reset_demo_learner(
     - Roadmap: Injects SQL JOIN remediation and locks downstream steps
     - Resets all non-seed evidence, lab attempts, and assessment attempts
     """
+    if getattr(settings, "ENVIRONMENT", "").lower() == "production":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Development-only demo reset is disabled in production.",
+        )
+
     alex = db.query(User).filter(User.email == "alex.mercer@example.com").first()
     if not alex:
         raise HTTPException(

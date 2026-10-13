@@ -47,19 +47,17 @@ export const CoachProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [error, setError] = useState<string | null>(null);
   const [suggestedPrompts, setSuggestedPrompts] = useState<string[]>(INITIAL_SUGGESTED_PROMPTS);
 
-  // Initialize initial message when user is loaded or first mounted
+  // Initialize initial message when user is loaded or learner changes
   useEffect(() => {
-    if (messages.length === 0) {
-      const learnerName = activeUser?.name || 'Alex';
-      setMessages([
-        {
-          role: 'assistant',
-          content: `Hi ${learnerName}, what would you like to work on?`,
-          timestamp: 'Just now',
-        },
-      ]);
-    }
-  }, [activeUser?.name, messages.length]);
+    const learnerName = activeUser?.name || 'there';
+    setMessages([
+      {
+        role: 'assistant',
+        content: `Hi ${learnerName}, what would you like to work on?`,
+        timestamp: 'Just now',
+      },
+    ]);
+  }, [activeUserId, activeUser?.name]);
 
   const openCoach = useCallback((prompt?: string) => {
     setIsOpen(true);
@@ -113,7 +111,7 @@ export const CoachProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         .map((m) => ({ role: m.role, content: m.content }));
 
       const res: ApiCoachChatResponse = await api.coachChat({
-        user_id: activeUserId || 1,
+        user_id: activeUserId,
         message: messageText,
         history: historyPayload,
       });

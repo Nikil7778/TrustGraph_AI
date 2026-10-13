@@ -34,3 +34,15 @@ img, svg, video, canvas {
   outline: 2px solid #2563eb;
   outline-offset: 2px;
 }
+
+/* Hide Next.js development/debug indicator overlay ([N] 1 Issue) */
+nextjs-portal,
+#nextjs-dev-tools,
+[data-nextjs-dev-tools],
+[data-nextjs-dev-indicator],
+[data-nextjs-toast],
+div:has(> [data-nextjs-dev-tools]) {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}

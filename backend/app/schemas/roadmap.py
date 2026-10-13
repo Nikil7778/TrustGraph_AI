@@ -18,6 +18,7 @@ class RoadmapStepResponse(BaseModel):
     estimated_minutes: int
     prerequisite_step_ids: Optional[str] = None
     evidence_required: Optional[str] = None
+    module_slug: Optional[str] = None
     completed_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)

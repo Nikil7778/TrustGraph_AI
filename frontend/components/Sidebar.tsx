@@ -18,6 +18,7 @@ import {
   X,
   Compass,
   Sparkles,
+  BookOpen,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -41,6 +42,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       title: 'LEARNING',
       items: [
+        { name: 'Learning Path', href: '/learn', icon: BookOpen },
         { name: 'Skill DNA', href: '/skill-dna', icon: Dna },
         { name: 'Career Gap', href: '/career-gap', icon: GitCompare },
         { name: 'Roadmap', href: '/roadmap', icon: MapPin },

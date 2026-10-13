@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AppShell } from '../../components/AppShell';
+import { useLearner } from '../../context/LearnerContext';
 import { useCoach } from '../../context/CoachContext';
 import { api, ApiSkillDebt } from '../../services/api';
 import {
@@ -19,21 +20,19 @@ import {
 
 export default function SkillDebtPage() {
   const router = useRouter();
+  const { activeUserId } = useLearner();
   const { openCoach } = useCoach();
   const [skillDebts, setSkillDebts] = useState<ApiSkillDebt[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRecalculating, setIsRecalculating] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadSkillDebtData();
-  }, []);
-
-  const loadSkillDebtData = async () => {
+  const loadSkillDebtData = useCallback(async () => {
+    if (!activeUserId) return;
     setIsLoading(true);
     setError(null);
     try {
-      const data = await api.getSkillDebt(1);
+      const data = await api.getSkillDebt(activeUserId);
       setSkillDebts(data);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to load Skill Debt analysis from backend.';
@@ -42,12 +41,17 @@ export default function SkillDebtPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [activeUserId]);
+
+  useEffect(() => {
+    loadSkillDebtData();
+  }, [loadSkillDebtData]);
 
   const handleRecalculate = async () => {
+    if (!activeUserId) return;
     setIsRecalculating(true);
     try {
-      const updated = await api.recalculateSkillDebt(1);
+      const updated = await api.recalculateSkillDebt(activeUserId);
       setSkillDebts(updated);
     } catch (err: unknown) {
       console.error('Failed to recalculate Skill Debt:', err);
@@ -57,14 +61,15 @@ export default function SkillDebtPage() {
     }
   };
 
-  // Identify the dominant primary high-priority debt item (SQL JOINs)
+  // Only identify genuine SKILL_DEBT items
+  const activeDebts = skillDebts.filter((d) => d.debt_status === 'SKILL_DEBT');
   const primaryDebt =
-    skillDebts.find((d) => d.severity === 'HIGH' || d.debt_status === 'SKILL_DEBT') ||
-    skillDebts[0] ||
+    activeDebts.find((d) => d.severity === 'HIGH') ||
+    activeDebts[0] ||
     null;
 
   // Secondary items
-  const otherDebts = skillDebts.filter(
+  const otherDebts = activeDebts.filter(
     (d) => !primaryDebt || d.skill_id !== primaryDebt.skill_id
   );
 
@@ -72,7 +77,7 @@ export default function SkillDebtPage() {
     <AppShell>
       <div className="space-y-5 max-w-6xl mx-auto">
         {/* ========================================================================= */}
-        {/* 1. HEADER (Matches Stitch Screenshot 2)                                   */}
+        {/* 1. HEADER                                                                 */}
         {/* ========================================================================= */}
         <div className="space-y-1">
           <div className="flex items-center gap-1.5 text-rose-600 font-bold uppercase tracking-wider text-[11px]">
@@ -105,7 +110,7 @@ export default function SkillDebtPage() {
         )}
 
         {/* ========================================================================= */}
-        {/* 2. CLASSIFICATION BAR (Matches Stitch Screenshot 2)                       */}
+        {/* 2. CLASSIFICATION BAR                                                     */}
         {/* ========================================================================= */}
         <div className="bg-white border border-slate-200 rounded-xl px-4 py-2.5 shadow-xs text-xs flex flex-wrap items-center gap-3 text-slate-600">
           <span className="font-bold text-slate-700 uppercase tracking-wider text-[10px]">
@@ -128,9 +133,26 @@ export default function SkillDebtPage() {
         </div>
 
         {/* ========================================================================= */}
-        {/* 3. DOMINANT PRIMARY SKILL DEBT CARD (Matches Stitch Screenshot 2)         */}
+        {/* 3. DOMINANT PRIMARY SKILL DEBT CARD                                       */}
         {/* ========================================================================= */}
-        {primaryDebt && (
+        {!primaryDebt ? (
+          <div className="bg-white border border-slate-200 rounded-xl p-8 shadow-xs text-center space-y-3">
+            <div className="w-12 h-12 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center mx-auto">
+              <CheckCircle2 className="w-6 h-6" />
+            </div>
+            <h3 className="text-base font-bold text-slate-900">No Active Skill Debt</h3>
+            <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+              Skill debt is identified when you have encountered a skill but your live evidence diverges from role requirements. Complete diagnostic assessments to establish your skill baseline.
+            </p>
+            <button
+              onClick={() => router.push('/assessments')}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-800 hover:bg-blue-900 text-white font-semibold text-xs rounded-md shadow-xs transition-colors cursor-pointer"
+            >
+              <span>Start Diagnostic Assessment</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ) : (
           <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs space-y-5">
             {/* Top row with Title and Right Metric Callout Box */}
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
@@ -140,7 +162,7 @@ export default function SkillDebtPage() {
                   HIGH PRIORITY DEBT
                 </span>
                 <h2 className="text-xl font-bold text-slate-900 mt-2 tracking-tight">
-                  {primaryDebt.skill_name} &amp; Multi-Table Logic
+                  {primaryDebt.skill_name}
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Core prerequisite for Target Vector: Data Analyst
@@ -165,7 +187,10 @@ export default function SkillDebtPage() {
 
             {/* Explanation box with red left accent border */}
             <div className="border-l-4 border-rose-500 bg-blue-50/40 p-3.5 rounded-r-lg text-xs text-slate-700 leading-relaxed font-normal">
-              You have demonstrated SQL fundamentals (76%), but recent real-world scenario tests revealed query failures on complex JOINs.
+              {primaryDebt.reason ||
+                `You have encountered ${primaryDebt.skill_name}, but current live proof (${Math.round(
+                  primaryDebt.current_skill_level
+                )}%) is below the required target.`}
             </div>
 
             {/* Transfer Gap Analysis Side-by-Side Cards */}
@@ -173,36 +198,48 @@ export default function SkillDebtPage() {
               <div className="flex items-center justify-between text-xs">
                 <span className="font-bold text-slate-900">Transfer Gap Analysis</span>
                 <span className="font-semibold text-rose-600 text-[11px]">
-                  -42 pt execution divergence
+                  -{Math.max(
+                    0,
+                    Math.round(primaryDebt.role_requirement - primaryDebt.current_skill_level)
+                  )}{' '}
+                  pt execution divergence
                 </span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Academic Quiz Card */}
+                {/* Academic Target Card */}
                 <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/50 space-y-2">
                   <div className="flex items-center justify-between text-xs font-bold text-slate-900">
-                    <span>Academic Quiz</span>
-                    <span>84%</span>
+                    <span>Target Benchmark</span>
+                    <span>{Math.round(primaryDebt.role_requirement)}%</span>
                   </div>
                   <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
-                    <div className="bg-blue-900 h-full rounded-full" style={{ width: '84%' }} />
+                    <div
+                      className="bg-blue-900 h-full rounded-full"
+                      style={{ width: `${Math.round(primaryDebt.role_requirement)}%` }}
+                    />
                   </div>
                   <p className="text-[11px] text-slate-500">
-                    Validated theoretical syntax recall
+                    Role requirement benchmark
                   </p>
                 </div>
 
                 {/* Practical Code Execution Card */}
                 <div className="p-3.5 rounded-lg border border-rose-200 bg-rose-50/20 space-y-2">
                   <div className="flex items-center justify-between text-xs font-bold">
-                    <span className="text-rose-900">Practical Code Execution</span>
-                    <span className="text-rose-600 font-extrabold">42%</span>
+                    <span className="text-rose-900">Demonstrated Level</span>
+                    <span className="text-rose-600 font-extrabold">
+                      {Math.round(primaryDebt.current_skill_level)}%
+                    </span>
                   </div>
                   <div className="w-full bg-rose-100 rounded-full h-1.5 overflow-hidden">
-                    <div className="bg-rose-600 h-full rounded-full" style={{ width: '42%' }} />
+                    <div
+                      className="bg-rose-600 h-full rounded-full"
+                      style={{ width: `${Math.round(primaryDebt.current_skill_level)}%` }}
+                    />
                   </div>
                   <p className="text-[11px] text-slate-500">
-                    Cartesian join timeout under messy data conditions
+                    Live demonstrated performance
                   </p>
                 </div>
               </div>
@@ -212,7 +249,10 @@ export default function SkillDebtPage() {
             <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2 text-xs text-slate-600 font-medium">
                 <Sparkles className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                <span>Recommended: SQL JOIN Rescue Practice (5 scenarios • 25 mins)</span>
+                <span>
+                  Recommended:{' '}
+                  {primaryDebt.recommended_intervention || `Targeted practice for ${primaryDebt.skill_name}`}
+                </span>
               </div>
 
               <button
@@ -227,58 +267,61 @@ export default function SkillDebtPage() {
         )}
 
         {/* ========================================================================= */}
-        {/* 4. OTHER SKILLS NEEDING REFRESH (Matches Stitch Screenshot 2)              */}
+        {/* 4. OTHER SKILLS NEEDING REFRESH                                           */}
         {/* ========================================================================= */}
-        <div className="space-y-3 pt-2">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-900">
-              Other Skills Needing Refresh
-            </h3>
-            <span className="text-xs font-mono text-slate-400">
-              {otherDebts.length} items monitored
-            </span>
-          </div>
+        {otherDebts.length > 0 && (
+          <div className="space-y-3 pt-2">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900">
+                Other Skills Needing Refresh
+              </h3>
+              <span className="text-xs font-mono text-slate-400">
+                {otherDebts.length} items monitored
+              </span>
+            </div>
 
-          <div className="space-y-3">
-            {otherDebts.slice(0, 3).map((item) => (
-              <div
-                key={item.skill_id}
-                className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs"
-              >
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-slate-400 shrink-0" />
-                    <span className="font-bold text-slate-900 text-sm">{item.skill_name}</span>
-                    <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
-                      {Math.round(item.current_skill_level)}% Proof
-                    </span>
+            <div className="space-y-3">
+              {otherDebts.slice(0, 3).map((item) => (
+                <div
+                  key={item.skill_id}
+                  className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-slate-400 shrink-0" />
+                      <span className="font-bold text-slate-900 text-sm">{item.skill_name}</span>
+                      <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                        {Math.round(item.current_skill_level)}% Proof
+                      </span>
+                    </div>
+                    <p className="text-slate-500 text-xs">
+                      {item.reason || `Recency decay detected for ${item.skill_name}`}
+                    </p>
                   </div>
-                  <p className="text-slate-500 text-xs">
-                    {item.reason || `Recency decay detected for ${item.skill_name}`}
-                  </p>
-                </div>
 
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => openCoach(`How can I refresh ${item.skill_name}?`)}
-                    className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 border border-slate-200 rounded-md transition-colors cursor-pointer"
-                  >
-                    Ask Coach
-                  </button>
-                  <Link
-                    href="/assessments"
-                    className="px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-md transition-colors flex items-center gap-1"
-                  >
-                    <span>Refresh Assessment</span>
-                    <ArrowRight className="w-3 h-3" />
-                  </Link>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => openCoach(`How can I refresh ${item.skill_name}?`)}
+                      className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 border border-slate-200 rounded-md transition-colors cursor-pointer"
+                    >
+                      Ask Coach
+                    </button>
+                    <Link
+                      href="/assessments"
+                      className="px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-md transition-colors flex items-center gap-1"
+                    >
+                      <span>Refresh Assessment</span>
+                      <ArrowRight className="w-3 h-3" />
+                    </Link>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </AppShell>
   );
 }
+

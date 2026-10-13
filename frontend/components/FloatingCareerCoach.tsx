@@ -334,6 +334,7 @@ export const FloatingCareerCoach: React.FC = () => {
             type="button"
             onClick={toggleCoach}
             aria-label="SkillPath Career Coach"
+            aria-expanded={isOpen}
             className="w-14 h-14 rounded-full bg-blue-800 hover:bg-blue-900 text-white shadow-lg hover:shadow-xl transition-all cursor-pointer flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
           >
             {isOpen ? (

@@ -1,0 +1,135 @@
+{
+  "model_name": "skillpath_mastery_predictor",
+  "model_version": "1.0.0",
+  "model_type": "RandomForestClassifier",
+  "training_source": "EdNet-derived learner progression benchmark with anti-leakage state guarantees",
+  "is_advisory": true,
+  "training_date": "2026-10-12T18:25:29.007483",
+  "random_seed": 42,
+  "sklearn_version": "1.9.1",
+  "python_version": "3.14.0",
+  "dataset_summary": {
+    "total_rows": 4917,
+    "learner_count": 120,
+    "skill_count": 8,
+    "train_rows": 3433,
+    "train_learners": 84,
+    "val_rows": 756,
+    "val_learners": 18,
+    "test_rows": 728,
+    "test_learners": 18
+  },
+  "target_definition": "Binary 1 if next proof score >= 70.0%, 0 otherwise (anti-leakage pre-attempt state)",
+  "feature_count": 28,
+  "feature_names": [
+    "previous_attempts",
+    "total_attempts",
+    "previous_accuracy",
+    "recent_accuracy",
+    "rolling_accuracy",
+    "correct_streak",
+    "incorrect_streak",
+    "average_response_time",
+    "recent_response_time",
+    "days_since_previous_attempt",
+    "average_difficulty_exposure",
+    "recent_difficulty",
+    "hard_question_exposure",
+    "medium_question_exposure",
+    "easy_question_exposure",
+    "assessment_evidence_count",
+    "practice_evidence_count",
+    "project_evidence_count",
+    "practical_evidence_count",
+    "days_since_last_evidence",
+    "evidence_recency",
+    "current_skill_level",
+    "current_confidence",
+    "current_accuracy",
+    "current_evidence_score",
+    "current_practical_evidence",
+    "role_skill_importance",
+    "role_requirement_level"
+  ],
+  "baseline_metrics": {
+    "accuracy": 0.6362,
+    "precision": 0.6362,
+    "recall": 1.0,
+    "f1": 0.7777,
+    "roc_auc": 0.5,
+    "pr_auc": 0.6362,
+    "confusion_matrix": {
+      "true_negative": 0,
+      "false_positive": 275,
+      "false_negative": 0,
+      "true_positive": 481
+    }
+  },
+  "cross_validation_metrics": {
+    "n_splits": 5,
+    "mean_accuracy": 0.6995,
+    "mean_precision": 0.8389,
+    "mean_recall": 0.6528,
+    "mean_f1": 0.7336,
+    "mean_roc_auc": 0.7921,
+    "mean_pr_auc": 0.8725
+  },
+  "validation_metrics": {
+    "accuracy": 0.6944,
+    "precision": 0.8109,
+    "recall": 0.6778,
+    "f1": 0.7384,
+    "roc_auc": 0.7586,
+    "pr_auc": 0.8484,
+    "confusion_matrix": {
+      "true_negative": 199,
+      "false_positive": 76,
+      "false_negative": 155,
+      "true_positive": 326
+    }
+  },
+  "final_test_metrics": {
+    "accuracy": 0.6841,
+    "precision": 0.7959,
+    "recall": 0.671,
+    "f1": 0.7281,
+    "roc_auc": 0.776,
+    "pr_auc": 0.8428,
+    "confusion_matrix": {
+      "true_negative": 190,
+      "false_positive": 79,
+      "false_negative": 151,
+      "true_positive": 308
+    }
+  },
+  "top_feature_signals": [
+    {
+      "feature": "current_skill_level",
+      "importance": 0.2965
+    },
+    {
+      "feature": "rolling_accuracy",
+      "importance": 0.1292
+    },
+    {
+      "feature": "current_accuracy",
+      "importance": 0.1047
+    },
+    {
+      "feature": "recent_accuracy",
+      "importance": 0.0805
+    },
+    {
+      "feature": "previous_accuracy",
+      "importance": 0.0761
+    },
+    {
+      "feature": "correct_streak",
+      "importance": 0.0581
+    },
+    {
+      "feature": "average_response_time",
+      "importance": 0.0293
+    }
+  ]
+}

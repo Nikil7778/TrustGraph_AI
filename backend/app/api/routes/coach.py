@@ -1,8 +1,9 @@
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.auth import get_current_user_optional
 from app.services.coach_service import coach_service
 from app.schemas.coach import (
     CoachChatRequest,
@@ -15,6 +16,7 @@ router = APIRouter(prefix="/coach", tags=["AI Career Coach"])
 @router.post("/chat", response_model=CoachChatResponse)
 def coach_chat(
     payload: CoachChatRequest,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     """
@@ -22,7 +24,11 @@ def coach_chat(
     Answers natural language inquiries regarding the learner's actual current state
     (DNA, Debt, Career Value, Next-Best-Proof, Roadmap, Evidence, Passport)
     via Gemini function calling or high-yield deterministic fallback.
+    Automatically resolves the authenticated learner.
     """
+    current_user = get_current_user_optional(request, db)
+    if current_user:
+        payload.user_id = current_user.id
     try:
         return coach_service.chat(db, payload)
     except Exception as e:
@@ -39,6 +45,7 @@ def get_suggested_prompts():
     """
     return [
         "What should I do next?",
+        "What is my predicted readiness for SQL JOINs?",
         "Why is SQL JOINs my priority?",
         "What are my weakest skills?",
         "How close am I to being ready for Data Analyst?",

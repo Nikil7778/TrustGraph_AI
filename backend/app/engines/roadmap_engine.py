@@ -1,26 +1,54 @@
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
+from app.engines.role_curriculum import role_curriculum_engine
 
 
 class RoadmapEngine:
     """
-    Dynamic Roadmap Engine (Phase 9)
+    Dynamic Roadmap Engine (Phase 19).
     Core Principle: 'The learner does not follow the roadmap. The roadmap follows the learner.'
     Deterministic engine that continuously updates the career roadmap based on:
+    - Target Role Curriculum & Benchmark Profile
     - Skill DNA
     - Skill Debt
     - Career Value
     - Next-Best-Proof
-    - Prerequisite DAG dependencies
+    - Role-Specific Prerequisite DAG dependencies
     - RoleSkill importance weights
     """
 
-    PREREQUISITES_GRAPH = {
-        "SQL JOINs": ["SQL"],
-        "EDA": ["Python", "Statistics"],
-        "Data Visualization": ["EDA"],
-        "Power BI": ["Data Visualization"],
-        "Machine Learning": ["Python", "Statistics", "EDA"],
+    SKILL_MODULE_MAP = {
+        # Data Analyst & shared skills
+        "SQL": "sql-fundamentals",
+        "SQL JOINs": "sql-joins-mastery",
+        "Python": "python-pandas-pipelines",
+        "Statistics": "statistics-hypothesis-testing",
+        "EDA": "eda-workflow-data-profiling",
+        "Data Visualization": "power-bi-dax-modeling",
+        "Power BI": "power-bi-dax-modeling",
+        # Data Scientist skills
+        "Machine Learning": "machine-learning-foundations",
+        "Deep Learning": "machine-learning-foundations",
+        "Feature Engineering": "feature-engineering-pipelines",
+        "Model Evaluation": "model-evaluation-metrics",
+        # Python Developer skills
+        "Python Basics": "python-core-fundamentals",
+        "OOP": "python-oop-architecture",
+        "Data Structures": "python-oop-architecture",
+        "Exception Handling": "python-error-handling-robustness",
+        "SQL Basics": "sql-fundamentals",
+        "HTTP & REST APIs": "rest-api-design-architecture",
+        "FastAPI": "fastapi-rest-endpoints",
+        "Testing & PyTest": "pytest-automated-testing",
+        "Git": "python-core-fundamentals",
+        "Deployment & Docker": "docker-container-deployment",
+    }
+
+    SKILL_ALIASES = {
+        "Python Basics": ["Python"],
+        "Python": ["Python Basics"],
+        "SQL Basics": ["SQL"],
+        "SQL": ["SQL Basics"],
     }
 
     PREREQ_HEALTHY_THRESHOLD = 65.0
@@ -40,7 +68,58 @@ class RoadmapEngine:
         """
         Builds dynamic roadmap steps, regeneration reason, and change log.
         """
-        # 1. Filter role skills by importance (Data Analyst baseline path excludes ML importance < 60)
+        total_evidence = sum(dna.get("evidence_count", 0) for dna in dna_map.values())
+        has_demonstrated_skills = total_evidence > 0 or any(dna.get("skill_level", 0.0) > 0 for dna in dna_map.values())
+        if not has_demonstrated_skills:
+            first_skill_id = role_skills[0].get("skill_id", 1) if role_skills else 1
+            steps = [
+                {
+                    "skill_id": first_skill_id,
+                    "skill_name": "Diagnostic Assessment",
+                    "title": "Complete Diagnostic Assessment",
+                    "step_type": "ASSESSMENT",
+                    "status": "RECOMMENDED",
+                    "priority": "CRITICAL",
+                    "order_index": 1,
+                    "estimated_minutes": 20,
+                    "reason": "Complete baseline diagnostic evaluation to establish your Skill DNA vector across core role competencies.",
+                    "prerequisite_step_ids": None,
+                    "evidence_required": "Answer foundational diagnostic assessment questions.",
+                    "completed_at": None,
+                },
+                {
+                    "skill_id": first_skill_id,
+                    "skill_name": "Skill DNA Calibration",
+                    "title": "Build Skill DNA",
+                    "step_type": "LEARN",
+                    "status": "BLOCKED",
+                    "priority": "HIGH",
+                    "order_index": 2,
+                    "estimated_minutes": 5,
+                    "reason": "Calibrate accuracy, difficulty, confidence, and recency dimensions from your assessment responses.",
+                    "prerequisite_step_ids": "1",
+                    "evidence_required": "Automatic calibration following diagnostic assessment completion.",
+                    "completed_at": None,
+                },
+                {
+                    "skill_id": first_skill_id,
+                    "skill_name": "Personalized Roadmap",
+                    "title": "Generate Personalized Roadmap",
+                    "step_type": "LEARN",
+                    "status": "BLOCKED",
+                    "priority": "HIGH",
+                    "order_index": 3,
+                    "estimated_minutes": 5,
+                    "reason": "Dynamically sequence learning, practice, and practical tasks based on verified gaps.",
+                    "prerequisite_step_ids": "2",
+                    "evidence_required": "Generated automatically once baseline Skill DNA is calibrated.",
+                    "completed_at": None,
+                },
+            ]
+            regeneration_reason = "Initial onboarding roadmap: complete diagnostic assessment to build your Skill DNA and generate your personalized career path."
+            return steps, regeneration_reason, []
+
+        # 1. Filter role skills by importance
         relevant_role_skills = [
             rs for rs in role_skills if rs.get("importance_score", 50) >= 60
         ]
@@ -49,8 +128,11 @@ class RoadmapEngine:
 
         skill_req_map = {rs["skill_name"]: rs for rs in relevant_role_skills}
 
+        # Retrieve role-specific prerequisite DAG from curriculum engine
+        role_prereqs = role_curriculum_engine.get_prerequisite_graph_for_role(target_role_name)
+
         # Also register prerequisite skills
-        for s_name, prereqs in self.PREREQUISITES_GRAPH.items():
+        for s_name, prereqs in role_prereqs.items():
             for p in prereqs:
                 if p not in skill_req_map:
                     for rs in role_skills:
@@ -68,6 +150,18 @@ class RoadmapEngine:
             skill_level = dna.get("skill_level", 0.0)
             required_level = float(rs.get("required_level", 80))
             evidence_count = dna.get("evidence_count", 0)
+
+            # Preserve learner evidence across role switches via skill aliases (e.g., Python <-> Python Basics)
+            if evidence_count == 0 or skill_level < self.PREREQ_HEALTHY_THRESHOLD:
+                aliases = self.SKILL_ALIASES.get(s_name, [])
+                for alias in aliases:
+                    for d_id, d_val in dna_map.items():
+                        if d_val.get("skill_name") == alias and d_val.get("evidence_count", 0) > 0:
+                            alias_level = d_val.get("skill_level", 0.0)
+                            if alias_level > skill_level:
+                                skill_level = alias_level
+                                evidence_count = d_val.get("evidence_count", 0)
+
             gap = max(0.0, required_level - skill_level)
 
             debt_status = debt.get("debt_status", "")
@@ -108,9 +202,9 @@ class RoadmapEngine:
                 "dna_status": dna.get("status", "DEVELOPING"),
             }
 
-        # Helper to check prerequisites
+        # Helper to check prerequisites based on role DAG
         def are_prereqs_satisfied(skill_name: str) -> Tuple[bool, Optional[str]]:
-            prereqs = self.PREREQUISITES_GRAPH.get(skill_name, [])
+            prereqs = role_prereqs.get(skill_name, [])
             for p in prereqs:
                 p_state = skill_state.get(p)
                 if not p_state or not p_state["is_completed"]:
@@ -119,12 +213,11 @@ class RoadmapEngine:
                     return False, f"Requires {p} to be completed (currently {curr:.0f}% / {req:.0f}%)."
             return True, None
 
-        # 3. Baseline pathway order for Data Analyst
-        # Python -> SQL -> (SQL JOINs if debt/relevant) -> EDA -> Data Visualization -> Power BI
-        baseline_order = ["Python", "SQL", "SQL JOINs", "EDA", "Data Visualization", "Power BI"]
+        # 3. Role-specific baseline pathway order
+        baseline_order = role_curriculum_engine.get_baseline_pathway_for_role(target_role_name)
         pathway_skills = [s for s in baseline_order if s in skill_state]
         for s in skill_state:
-            if s not in pathway_skills and s != "Statistics":
+            if s not in pathway_skills:
                 pathway_skills.append(s)
 
         # 4. Generate step progression
@@ -138,6 +231,7 @@ class RoadmapEngine:
             st = skill_state[s_name]
             s_id = st["skill_id"]
             prereqs_ok, prereq_reason = are_prereqs_satisfied(s_name)
+            mod_slug = self.SKILL_MODULE_MAP.get(s_name)
 
             # A. COMPLETED SKILL
             if st["is_completed"]:
@@ -153,6 +247,7 @@ class RoadmapEngine:
                     "reason": f"Demonstrated {st['skill_level']:.1f}% proficiency exceeding role requirement ({st['required_level']:.0f}%).",
                     "prerequisite_step_ids": None,
                     "evidence_required": f"Verified with {st['evidence_count']} proof artifact(s).",
+                    "module_slug": mod_slug,
                     "completed_at": datetime.utcnow().isoformat(),
                 })
                 step_order += 1
@@ -163,7 +258,6 @@ class RoadmapEngine:
                 remediation_inserted_skills.append(s_name)
                 active_blocker_skill = s_name
 
-                # Clean naming (e.g. "SQL JOIN Rescue Practice" for SQL JOINs)
                 clean_name = "SQL JOIN" if s_name == "SQL JOINs" else s_name
 
                 # Step 1: Rescue Practice (Matches Next-Best-Proof)
@@ -182,7 +276,8 @@ class RoadmapEngine:
                     "estimated_minutes": 25,
                     "reason": f"Inserted because {s_name} is currently below the {target_role_name} requirement ({st['skill_level']:.1f}% vs {st['required_level']:.0f}%) and has high Skill Debt.",
                     "prerequisite_step_ids": None,
-                    "evidence_required": f"8/10 JOIN problems solved correctly in SQL Practice Lab.",
+                    "evidence_required": f"Targeted {s_name} problem resolution in learning sandbox.",
+                    "module_slug": mod_slug,
                     "completed_at": None,
                 })
                 step_order += 1
@@ -200,7 +295,8 @@ class RoadmapEngine:
                     "estimated_minutes": 20,
                     "reason": f"Validate proficiency recovery on {s_name} before downstream advancement.",
                     "prerequisite_step_ids": str(practice_order),
-                    "evidence_required": f"Score >= 75% on {s_name} Diagnostic Assessment.",
+                    "evidence_required": f"Score >= 75% on {s_name} Concept Check.",
+                    "module_slug": mod_slug,
                     "completed_at": None,
                 })
                 step_order += 1
@@ -218,10 +314,21 @@ class RoadmapEngine:
                     "reason": f"Demonstrate job-ready practical {s_name} competency on production datasets.",
                     "prerequisite_step_ids": str(reassess_order),
                     "evidence_required": f"Complete multi-table transaction query analysis on database.",
+                    "module_slug": mod_slug,
                     "completed_at": None,
                 })
                 step_order += 1
                 continue
+
+            # Title mapping
+            if s_name == "Machine Learning":
+                skill_title = "Machine Learning & Predictive Modeling Lab"
+            elif s_name == "Statistics":
+                skill_title = "Statistics & Hypothesis Testing Lab"
+            elif s_name == "Deep Learning":
+                skill_title = "Deep Learning & Neural Networks Lab"
+            else:
+                skill_title = f"{s_name} Core Application Lab"
 
             # C. BLOCKED SKILL (Prerequisites insufficient OR upstream remediation active)
             if not prereqs_ok or active_blocker_skill:
@@ -229,7 +336,7 @@ class RoadmapEngine:
                 steps.append({
                     "skill_id": s_id,
                     "skill_name": s_name,
-                    "title": f"{s_name} Core Application Lab",
+                    "title": skill_title,
                     "step_type": "LEARN",
                     "status": "BLOCKED",
                     "priority": "Medium",
@@ -238,6 +345,7 @@ class RoadmapEngine:
                     "reason": block_reason,
                     "prerequisite_step_ids": None,
                     "evidence_required": f"Prerequisites and upstream remediations must be completed before unlocking.",
+                    "module_slug": mod_slug,
                     "completed_at": None,
                 })
                 step_order += 1
@@ -251,7 +359,7 @@ class RoadmapEngine:
             steps.append({
                 "skill_id": s_id,
                 "skill_name": s_name,
-                "title": f"{s_name} Core Application Lab",
+                "title": skill_title,
                 "step_type": "PRACTICE" if st["evidence_count"] > 0 else "LEARN",
                 "status": status,
                 "priority": "High" if st["importance_score"] >= 80 else "Medium",
@@ -259,31 +367,38 @@ class RoadmapEngine:
                 "estimated_minutes": 50,
                 "reason": f"Develop core {s_name} proficiency toward {target_role_name} benchmark ({st['skill_level']:.1f}% / {st['required_level']:.0f}%).",
                 "prerequisite_step_ids": None,
-                "evidence_required": f"Complete {s_name} lab tasks with verified benchmark proof.",
+                "evidence_required": f"Complete {s_name} module tasks with verified benchmark proof.",
+                "module_slug": mod_slug,
                 "completed_at": None,
             })
             step_order += 1
 
-        # 5. Capstone Project
-        capstone_skill = skill_state.get("Python", list(skill_state.values())[0])
+        # 5. Capstone Project tailored to Role Profile
+        role_profile = role_curriculum_engine.get_role_profile(target_role_name)
+        capstone_title = role_profile.get("capstone_title", f"End-to-End {target_role_name} Capstone Portfolio Project")
+        capstone_desc = role_profile.get("capstone_description", f"Synthesize verified evidence across all core {target_role_name} competencies.")
+        
         capstone_blocked = any(
             not st["is_completed"]
             for s_name, st in skill_state.items()
-            if s_name in ["Python", "SQL", "EDA", "Data Visualization", "Power BI"]
+            if st["importance_score"] >= 75
         )
+
+        capstone_skill = skill_state.get("Python", list(skill_state.values())[0]) if skill_state else {"skill_id": 1, "skill_name": "Capstone"}
 
         steps.append({
             "skill_id": capstone_skill["skill_id"],
             "skill_name": capstone_skill["skill_name"],
-            "title": f"End-to-End {target_role_name} Capstone Portfolio Project",
+            "title": capstone_title,
             "step_type": "CAPSTONE",
             "status": "BLOCKED" if capstone_blocked else ("RECOMMENDED" if not active_recommended_assigned else "IN_PROGRESS"),
             "priority": "High",
             "order_index": step_order,
             "estimated_minutes": 240,
-            "reason": f"Synthesize verified evidence across all core {target_role_name} competencies for Skill Passport certification.",
+            "reason": capstone_desc,
             "prerequisite_step_ids": None,
             "evidence_required": f"Complete end-to-end dataset analysis project with code, visualizations, and executive presentation.",
+            "module_slug": None,
             "completed_at": None,
         })
 

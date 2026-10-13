@@ -38,6 +38,7 @@ class RoadmapStep(Base):
     estimated_minutes = Column(Integer, default=30, nullable=False)
     prerequisite_step_ids = Column(String(255), nullable=True)
     evidence_required = Column(Text, nullable=True)
+    module_slug = Column(String(100), nullable=True)
     completed_at = Column(DateTime, nullable=True)
 
     # Relationships

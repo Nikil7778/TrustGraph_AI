@@ -9,7 +9,7 @@ import { ProjectData } from '../../types';
 import { FolderGit2, Plus, X, Play, Loader2, CheckCircle2, Award, ExternalLink } from 'lucide-react';
 
 export default function ProjectsPage() {
-  const { projects, submitProject, userEvidence } = useLearner();
+  const { projects, submitProject, userEvidence, isDemoMode } = useLearner();
   const [activeProject, setActiveProject] = useState<ProjectData | null>(null);
   const [simScore, setSimScore] = useState<number>(90);
   const [feedback, setFeedback] = useState<string>('All test suite assertions passed with robust coverage.');
@@ -33,7 +33,7 @@ export default function ProjectsPage() {
           lastUpdated: verifiedEv ? 'Verified Recently' : 'Active Benchmark',
         };
       })
-    : MOCK_PROJECTS;
+    : (isDemoMode ? MOCK_PROJECTS : []);
 
   const handleLaunchProject = (project: ProjectData) => {
     setActiveProject(project);

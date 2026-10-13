@@ -16,6 +16,9 @@ class User(Base):
     learning_goal = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    google_id = Column(String(255), nullable=True, index=True)
+    avatar_url = Column(String(1024), nullable=True)
+    password_hash = Column(String(255), nullable=True)
 
     # Relationships
     target_role = relationship("Role", back_populates="users")

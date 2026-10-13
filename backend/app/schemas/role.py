@@ -28,3 +28,36 @@ class RoleResponse(BaseModel):
 class RoleCreate(BaseModel):
     name: str
     description: Optional[str] = None
+
+
+class CustomRoleCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    skills: Optional[List[str]] = None
+
+
+class SkillMapItem(BaseModel):
+    id: Optional[int] = None
+    skill_id: Optional[int] = None
+    name: str
+    category: Optional[str] = "General Competencies"
+    description: Optional[str] = None
+    importance_score: int
+    required_level: int
+    industry_relevance: str
+
+
+
+class SkillMapCategory(BaseModel):
+    category_name: str
+    skills: List[SkillMapItem]
+
+
+class RoleSkillMapResponse(BaseModel):
+    role_id: int
+    role_name: str
+    description: Optional[str] = None
+    total_skills: int
+    categories: List[SkillMapCategory]
+    skills: List[SkillMapItem]
+

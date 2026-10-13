@@ -1,0 +1,231 @@
+{
+  "feature_schema_version": "1.0.0",
+  "target_name": "next_attempt_success",
+  "target_definition": "Binary 1 if the learner demonstrates proficiency >= 70.0% on the next proof attempt, otherwise 0.",
+  "features": [
+    {
+      "name": "previous_attempts",
+      "type": "int",
+      "category": "BEHAVIORAL",
+      "min": 0,
+      "max": 100,
+      "description": "Total prior attempts on this skill"
+    },
+    {
+      "name": "total_attempts",
+      "type": "int",
+      "category": "BEHAVIORAL",
+      "min": 0,
+      "max": 500,
+      "description": "Total prior attempts across all skills"
+    },
+    {
+      "name": "previous_accuracy",
+      "type": "float",
+      "category": "BEHAVIORAL",
+      "min": 0.0,
+      "max": 100.0,
+      "description": "Accuracy on immediately preceding attempt on this skill"
+    },
+    {
+      "name": "recent_accuracy",
+      "type": "float",
+      "category": "BEHAVIORAL",
+      "min": 0.0,
+      "max": 100.0,
+      "description": "Rolling average accuracy of up to 3 recent attempts on this skill"
+    },
+    {
+      "name": "rolling_accuracy",
+      "type": "float",
+      "category": "BEHAVIORAL",
+      "min": 0.0,
+      "max": 100.0,
+      "description": "Cumulative historical accuracy on this skill"
+    },
+    {
+      "name": "correct_streak",
+      "type": "int",
+      "category": "BEHAVIORAL",
+      "min": 0,
+      "max": 50,
+      "description": "Consecutive successful attempts on this skill prior to this attempt"
+    },
+    {
+      "name": "incorrect_streak",
+      "type": "int",
+      "category": "BEHAVIORAL",
+      "min": 0,
+      "max": 50,
+      "description": "Consecutive unsuccessful attempts on this skill prior to this attempt"
+    },
+    {
+      "name": "average_response_time",
+      "type": "float",
+      "category": "BEHAVIORAL",
+      "min": 0.0,
+      "max": 120.0,
+      "description": "Average response/completion time in minutes across prior attempts"
+    },
+    {
+      "name": "recent_response_time",
+      "type": "float",
+      "category": "BEHAVIORAL",
+      "min": 0.0,
+      "max": 120.0,
+      "description": "Completion time in minutes on most recent prior attempt"
+    },
+    {
+      "name": "days_since_previous_attempt",
+      "type": "float",
+      "category": "BEHAVIORAL",
+      "min": 0.0,
+      "max": 365.0,
+      "description": "Calendar days since prior attempt on this skill"
+    },
+    {
+      "name": "average_difficulty_exposure",
+      "type": "float",
+      "category": "DIFFICULTY",
+      "min": 0.0,
+      "max": 100.0,
+      "description": "Mean difficulty score of prior attempts (35=Easy, 65=Medium, 90=Hard)"
+    },
+    {
+      "name": "recent_difficulty",
+      "type": "float",
+      "category": "DIFFICULTY",
+      "min": 0.0,
+      "max": 100.0,
+      "description": "Difficulty score of most recent prior attempt"
+    },
+    {
+      "name": "hard_question_exposure",
+      "type": "int",
+      "category": "DIFFICULTY",
+      "min": 0,
+      "max": 100,
+      "description": "Count of hard tasks attempted on this skill"
+    },
+    {
+      "name": "medium_question_exposure",
+      "type": "int",
+      "category": "DIFFICULTY",
+      "min": 0,
+      "max": 100,
+      "description": "Count of medium tasks attempted on this skill"
+    },
+    {
+      "name": "easy_question_exposure",
+      "type": "int",
+      "category": "DIFFICULTY",
+      "min": 0,
+      "max": 100,
+      "description": "Count of easy tasks attempted on this skill"
+    },
+    {
+      "name": "assessment_evidence_count",
+      "type": "int",
+      "category": "EVIDENCE",
+      "min": 0,
+      "max": 50,
+      "description": "Number of prior assessment evidence artifacts logged"
+    },
+    {
+      "name": "practice_evidence_count",
+      "type": "int",
+      "category": "EVIDENCE",
+      "min": 0,
+      "max": 50,
+      "description": "Number of prior practice evidence artifacts logged"
+    },
+    {
+      "name": "project_evidence_count",
+      "type": "int",
+      "category": "EVIDENCE",
+      "min": 0,
+      "max": 50,
+      "description": "Number of prior project evidence artifacts logged"
+    },
+    {
+      "name": "practical_evidence_count",
+      "type": "int",
+      "category": "EVIDENCE",
+      "min": 0,
+      "max": 100,
+      "description": "Total practical/applied evidence artifacts logged"
+    },
+    {
+      "name": "days_since_last_evidence",
+      "type": "float",
+      "category": "EVIDENCE",
+      "min": 0.0,
+      "max": 365.0,
+      "description": "Calendar days since any evidence was logged"
+    },
+    {
+      "name": "evidence_recency",
+      "type": "float",
+      "category": "EVIDENCE",
+      "min": 0.0,
+      "max": 100.0,
+      "description": "Exponential recency decay score up to prediction timestamp"
+    },
+    {
+      "name": "current_skill_level",
+      "type": "float",
+      "category": "SKILL",
+      "min": 0.0,
+      "max": 100.0,
+      "description": "Prior demonstrated skill level score (0-100)"
+    },
+    {
+      "name": "current_confidence",
+      "type": "float",
+      "category": "SKILL",
+      "min": 0.0,
+      "max": 100.0,
+      "description": "Prior deterministic confidence score (0-100)"
+    },
+    {
+      "name": "current_accuracy",
+      "type": "float",
+      "category": "SKILL",
+      "min": 0.0,
+      "max": 100.0,
+      "description": "Prior accuracy score (0-100)"
+    },
+    {
+      "name": "current_evidence_score",
+      "type": "float",
+      "category": "SKILL",
+      "min": 0.0,
+      "max": 100.0,
+      "description": "Prior evidence score (0-100)"
+    },
+    {
+      "name": "current_practical_evidence",
+      "type": "int",
+      "category": "SKILL",
+      "min": 0,
+      "max": 1,
+      "description": "Binary flag indicating prior practical proof exists (0 or 1)"
+    },
+    {
+      "name": "role_skill_importance",
+      "type": "float",
+      "category": "CAREER_CONTEXT",
+      "min": 0.0,
+      "max": 100.0,
+      "description": "Skill importance score for target role (0-100)"
+    },
+    {
+      "name": "role_requirement_level",
+      "type": "float",
+      "category": "CAREER_CONTEXT",
+      "min": 0.0,
+      "max": 100.0,
+      "description": "Target role required skill proficiency (0-100)"
+    }
+  ]
+}

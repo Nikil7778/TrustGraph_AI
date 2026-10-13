@@ -153,12 +153,33 @@ class SkillDNAEngine:
         skill_category: str,
         evidences: List[SkillEvidence],
         user_skill_difficulty: Optional[str] = "Intermediate",
+        existing_skill_level: Optional[float] = None,
+        existing_evidence_score: Optional[float] = None,
     ) -> Dict[str, Any]:
         """
         Computes full multi-dimensional Skill DNA vector for a skill based on evidence.
         """
         count = len(evidences)
         if count == 0:
+            if existing_skill_level is not None and existing_skill_level > 0:
+                ev_score = existing_evidence_score if existing_evidence_score is not None else existing_skill_level
+                return {
+                    "user_id": user_id,
+                    "skill_id": skill_id,
+                    "skill_name": skill_name,
+                    "skill_category": skill_category,
+                    "skill_level": existing_skill_level,
+                    "confidence": 75.0,
+                    "accuracy": existing_skill_level,
+                    "difficulty": 65.0,
+                    "difficulty_label": user_skill_difficulty or "Intermediate",
+                    "recency": 85.0,
+                    "recency_label": "Recent",
+                    "evidence_score": ev_score,
+                    "evidence_count": 1,
+                    "last_assessed_at": datetime.utcnow(),
+                    "status": self.determine_status(existing_skill_level, 1),
+                }
             return {
                 "user_id": user_id,
                 "skill_id": skill_id,

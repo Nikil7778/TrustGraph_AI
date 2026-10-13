@@ -50,5 +50,6 @@ class UserResponse(BaseModel):
     learning_goal: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+    avatar_url: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)

@@ -1,7 +1,8 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 import json
+
 
 
 class AssessmentQuestionPublicResponse(BaseModel):
@@ -14,6 +15,8 @@ class AssessmentQuestionPublicResponse(BaseModel):
     question_text: str
     options: List[str]
     difficulty: str
+    skill_id: Optional[int] = None
+    skill_name: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -41,13 +44,15 @@ class AssessmentResponse(BaseModel):
     id: int
     title: str
     description: Optional[str] = None
-    skill_id: int
+    skill_id: Optional[int] = None
+    role_id: Optional[int] = None
     skill_name: Optional[str] = None
     difficulty: str
     question_count: Optional[int] = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
 
 
 class AssessmentDetailResponse(AssessmentResponse):
@@ -108,4 +113,46 @@ class AssessmentAttemptResponse(BaseModel):
     completed_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class GoalAssessmentSubmission(BaseModel):
+    user_id: int = Field(..., gt=0, description="Learner user ID")
+    role_id: int = Field(..., gt=0, description="Target goal role ID")
+    answers: List[SingleQuestionAnswer] = Field(..., min_length=1, max_length=100)
+
+
+class SkillScoreDetail(BaseModel):
+    skill_id: int
+    skill_name: str
+    category: Optional[str] = "General"
+    score: float
+    questions_tested: int
+    questions_correct: int
+    required_level: int
+    gap: float
+    status: str  # Strong, Moderate, Weak, Missing
+
+
+class GoalAssessmentResultResponse(BaseModel):
+    attempt_id: int
+    user_id: int
+    role_id: int
+    role_name: str
+    overall_score: float
+    accuracy: float
+    total_questions: int
+    correct_questions: int
+    completed_at: datetime
+    skill_scores: List[SkillScoreDetail]
+    strong_skills: List[str]
+    moderate_skills: List[str]
+    weak_skills: List[str]
+    missing_skills: List[str]
+    next_recommended_action: Optional[Dict[str, Any]] = None
+    question_breakdown: List[QuestionReviewResult] = []
+
+
+GoalAssessmentResultResponse.model_rebuild()
+
+
 

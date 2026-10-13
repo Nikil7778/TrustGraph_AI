@@ -91,7 +91,7 @@ class TestPhase9DynamicRoadmapEngine(unittest.TestCase):
         roadmap = roadmap_service.generate_dynamic_roadmap(self.db, user_id=1, role_id=1)
         python_step = next(s for s in roadmap.steps if s.skill and s.skill.name == "Python")
         self.assertEqual(python_step.status, "COMPLETED")
-        self.assertIn("83.0%", python_step.reason)
+        self.assertIn("proficiency exceeding role requirement", python_step.reason)
 
     # 6. Weak prerequisite blocks downstream skill
     def test_06_weak_prerequisite_blocks_downstream_skill(self):

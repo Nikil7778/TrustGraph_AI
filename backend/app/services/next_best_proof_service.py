@@ -94,7 +94,47 @@ class NextBestProofService:
     ) -> Dict[str, Any]:
         """
         Selects the single highest-impact Next-Best-Proof action for the learner.
+        For a brand-new learner with no verified evidence, prescribes baseline diagnostic assessment.
         """
+        user = db.query(User).filter(User.id == user_id).first()
+        target_role_id = role_id or (user.target_role_id if user else None) or 1
+        role = db.query(Role).filter(Role.id == target_role_id).first()
+        role_name = role.name if role else "Target Role"
+
+        total_ev_count = db.query(SkillEvidence).filter(SkillEvidence.user_id == user_id).count()
+        if total_ev_count == 0:
+            first_skill = role.role_skills[0].skill if (role and role.role_skills) else None
+            return {
+                "user_id": user_id,
+                "role_id": target_role_id,
+                "role_name": role_name,
+                "skill_id": first_skill.id if first_skill else 1,
+                "skill_name": first_skill.name if first_skill else "Diagnostic",
+                "skill_category": "Diagnostic Assessment",
+                "action_type": "REASSESS",
+                "action_type_label": "Diagnostic Assessment",
+                "title": "Complete Diagnostic Assessment",
+                "priority": "HIGH",
+                "next_best_proof_score": 100.0,
+                "current_skill_level": 0.0,
+                "required_skill_level": 80.0,
+                "career_value_score": 90.0,
+                "skill_debt_score": 0.0,
+                "skill_debt_status": "MISSING",
+                "confidence": 0.0,
+                "evidence_score": 0.0,
+                "practical_evidence_score": 0.0,
+                "estimated_minutes": 20,
+                "expected_proof": "Complete your baseline diagnostic assessment to calibrate your Skill DNA.",
+                "reason": "Complete your diagnostic assessment to identify your highest-impact skill gaps and build your personalized career roadmap.",
+                "why_now": "Baseline diagnostic evaluation is required before personalized proof recommendations can be derived.",
+                "why_this_action": "We'll use your assessment results to build your Skill DNA and create a personalized career roadmap.",
+                "prerequisites": [],
+                "action_readiness": "HIGH",
+                "rank": 1,
+                "created_at": datetime.utcnow(),
+            }
+
         candidates = self.get_candidates(db, user_id, role_id)
         if not candidates:
             raise ValueError(f"No candidates generated for user {user_id}.")

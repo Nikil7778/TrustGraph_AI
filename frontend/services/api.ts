@@ -37,6 +37,7 @@ export interface ApiUser {
   learning_goal?: string;
   created_at: string;
   updated_at: string;
+  avatar_url?: string;
 }
 
 export interface ApiUserSkill {
@@ -70,18 +71,131 @@ export interface ApiAssessmentQuestionPublic {
   question_text: string;
   options: string[];
   difficulty: string;
+  skill_id?: number;
+  skill_name?: string;
 }
 
 export interface ApiAssessment {
   id: number;
   title: string;
   description?: string;
-  skill_id: number;
+  skill_id?: number;
+  role_id?: number;
   skill_name?: string;
   difficulty: string;
   question_count?: number;
   created_at: string;
 }
+
+export interface ApiSkillMapItem {
+  id?: number;
+  skill_id?: number;
+  name: string;
+  category: string;
+  description?: string;
+  importance_score: number;
+  required_level: number;
+  industry_relevance: string;
+}
+
+export interface ApiSkillMapCategory {
+  category_name: string;
+  skills: ApiSkillMapItem[];
+}
+
+export interface ApiRoleSkillMapResponse {
+  role_id: number;
+  role_name: string;
+  description?: string;
+  total_skills: number;
+  categories: ApiSkillMapCategory[];
+  skills: ApiSkillMapItem[];
+}
+
+export interface ApiCustomRoleCreate {
+  name: string;
+  description?: string;
+  skills?: string[];
+}
+
+export interface ApiSkillScoreDetail {
+  skill_id: number;
+  skill_name: string;
+  category: string;
+  score: number;
+  questions_tested: number;
+  questions_correct: number;
+  required_level: number;
+  gap: number;
+  status: 'Strong' | 'Moderate' | 'Weak' | 'Missing';
+}
+
+export interface ApiGoalNextAction {
+  title?: string;
+  skill_id?: number;
+  skill_name?: string;
+  current_level?: number;
+  required_level?: number;
+  gap?: number;
+  status?: string;
+  reason?: string;
+}
+
+export interface ApiGoalAssessmentSubmissionPayload {
+  user_id: number;
+  role_id: number;
+  answers: ApiSingleQuestionAnswer[];
+}
+
+export interface ApiGoalAssessmentResultResponse {
+  attempt_id: number;
+  user_id: number;
+  role_id: number;
+  role_name: string;
+  overall_score: number;
+  accuracy: number;
+  total_questions: number;
+  correct_questions: number;
+  completed_at: string;
+  skill_scores: ApiSkillScoreDetail[];
+  strong_skills: string[];
+  moderate_skills: string[];
+  weak_skills: string[];
+  missing_skills: string[];
+  next_recommended_action?: ApiGoalNextAction;
+  question_breakdown: ApiQuestionReviewResult[];
+}
+
+export interface ApiSkillGapItem {
+  skill_id: number;
+  skill_name: string;
+  category: string;
+  current_level: number;
+  required_level: number;
+  gap: number;
+  importance_score: number;
+  industry_relevance: string;
+  status: 'Strong' | 'Moderate' | 'Weak' | 'Missing';
+}
+
+export interface ApiSkillGapAnalysisResponse {
+  user_id: number;
+  role_id: number;
+  role_name: string;
+  overall_progress: number;
+  total_skills: number;
+  strong_count: number;
+  moderate_count: number;
+  weak_count: number;
+  missing_count: number;
+  strong_skills: string[];
+  moderate_skills: string[];
+  weak_skills: string[];
+  missing_skills: string[];
+  all_gaps: ApiSkillGapItem[];
+  next_recommended_action?: ApiGoalNextAction;
+}
+
 
 export interface ApiAssessmentDetail extends ApiAssessment {
   questions: ApiAssessmentQuestionPublic[];
@@ -172,17 +286,125 @@ async function handleResponse<T>(response: Response): Promise<T> {
   return response.json();
 }
 
+export interface ApiLoginRequest {
+  email: string;
+  password?: string;
+}
+
+export interface ApiGoogleAuthRequest {
+  credential?: string;
+  code?: string;
+  redirect_uri?: string;
+}
+
+export interface ApiAuthResponse {
+  user: ApiUser;
+  token: string;
+  message?: string;
+  is_new_user?: boolean;
+  needs_onboarding?: boolean;
+}
+
+export interface ApiLogoutResponse {
+  success: boolean;
+  message?: string;
+}
+
+function getAuthHeaders(customHeaders: Record<string, string> = {}): Record<string, string> {
+  const headers: Record<string, string> = { ...customHeaders };
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+      headers['X-Session-Token'] = token;
+    }
+  }
+  return headers;
+}
+
 export const api = {
+  // Authentication & Session Management
+  async login(payload: ApiLoginRequest): Promise<ApiAuthResponse> {
+    const res = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<ApiAuthResponse>(res);
+  },
+
+  async googleAuth(payload: ApiGoogleAuthRequest): Promise<ApiAuthResponse> {
+    const res = await fetch(`${API_BASE_URL}/auth/google`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<ApiAuthResponse>(res);
+  },
+
+  async logout(): Promise<ApiLogoutResponse> {
+    const res = await fetch(`${API_BASE_URL}/auth/logout`, {
+      method: 'POST',
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+      credentials: 'include',
+    });
+    return handleResponse<ApiLogoutResponse>(res);
+  },
+
+  async getMe(): Promise<ApiUser> {
+    const res = await fetch(`${API_BASE_URL}/auth/me`, {
+      headers: getAuthHeaders(),
+      credentials: 'include',
+      cache: 'no-store',
+    });
+    return handleResponse<ApiUser>(res);
+  },
+
+  async register(payload: ApiUserCreate & { password?: string }): Promise<ApiAuthResponse> {
+    const res = await fetch(`${API_BASE_URL}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<ApiAuthResponse>(res);
+  },
+
   // Roles & Skills
   async getRoles(): Promise<ApiRole[]> {
     const res = await fetch(`${API_BASE_URL}/roles`, { cache: 'no-store' });
     return handleResponse<ApiRole[]>(res);
   },
 
+  async getRoleSkillMap(roleId: number): Promise<ApiRoleSkillMapResponse> {
+    const res = await fetch(`${API_BASE_URL}/roles/${roleId}/skill-map`, { cache: 'no-store' });
+    return handleResponse<ApiRoleSkillMapResponse>(res);
+  },
+
+  async createCustomRole(payload: ApiCustomRoleCreate): Promise<ApiRole> {
+    const res = await fetch(`${API_BASE_URL}/roles/custom`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<ApiRole>(res);
+  },
+
   async getSkills(): Promise<ApiSkill[]> {
     const res = await fetch(`${API_BASE_URL}/skills`, { cache: 'no-store' });
     return handleResponse<ApiSkill[]>(res);
   },
+
+  async getSkillGapAnalysis(userId: number, roleId?: number): Promise<ApiSkillGapAnalysisResponse> {
+    const url = roleId
+      ? `${API_BASE_URL}/skills/gap-analysis/${userId}?role_id=${roleId}`
+      : `${API_BASE_URL}/skills/gap-analysis/${userId}`;
+    const res = await fetch(url, { cache: 'no-store' });
+    return handleResponse<ApiSkillGapAnalysisResponse>(res);
+  },
+
 
   // Users & Onboarding
   async getUsers(): Promise<ApiUser[]> {
@@ -228,6 +450,21 @@ export const api = {
     });
     return handleResponse<ApiAssessmentResult>(res);
   },
+
+  async getGoalAssessment(roleId: number): Promise<ApiAssessmentDetail> {
+    const res = await fetch(`${API_BASE_URL}/assessments/goal/${roleId}`, { cache: 'no-store' });
+    return handleResponse<ApiAssessmentDetail>(res);
+  },
+
+  async submitGoalAssessment(payload: ApiGoalAssessmentSubmissionPayload): Promise<ApiGoalAssessmentResultResponse> {
+    const res = await fetch(`${API_BASE_URL}/assessments/goal/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<ApiGoalAssessmentResultResponse>(res);
+  },
+
 
   async getUserAssessmentAttempts(userId: number): Promise<ApiAssessmentAttempt[]> {
     const res = await fetch(`${API_BASE_URL}/users/${userId}/assessment-attempts`, { cache: 'no-store' });
@@ -409,7 +646,7 @@ export const api = {
   async updateUser(userId: number, payload: Partial<ApiUserCreate>): Promise<ApiUser> {
     const res = await fetch(`${API_BASE_URL}/users/${userId}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(payload),
     });
     return handleResponse<ApiUser>(res);
@@ -570,7 +807,8 @@ export const api = {
   async coachChat(payload: ApiCoachChatRequest): Promise<ApiCoachChatResponse> {
     const res = await fetch(`${API_BASE_URL}/coach/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+      credentials: 'include',
       body: JSON.stringify(payload),
     });
     return handleResponse<ApiCoachChatResponse>(res);
@@ -579,6 +817,76 @@ export const api = {
   async getCoachSuggestedPrompts(): Promise<string[]> {
     const res = await fetch(`${API_BASE_URL}/coach/suggested-prompts`, { cache: 'no-store' });
     return handleResponse<string[]>(res);
+  },
+
+  // Phase 16 — Machine Learning Skill Mastery
+  async predictMastery(userId: number, skillId: number): Promise<ApiMLPredictionResponse> {
+    const res = await fetch(`${API_BASE_URL}/ml/predict-mastery`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId, skill_id: skillId }),
+    });
+    return handleResponse<ApiMLPredictionResponse>(res);
+  },
+
+  async getSkillMasteryPrediction(userId: number, skillId: number): Promise<ApiMLPredictionResponse> {
+    const res = await fetch(`${API_BASE_URL}/ml/predict-mastery/${userId}/${skillId}`, { cache: 'no-store' });
+    return handleResponse<ApiMLPredictionResponse>(res);
+  },
+
+  async getMLModelInfo(): Promise<ApiMLModelInfo> {
+    const res = await fetch(`${API_BASE_URL}/ml/model-info`, { cache: 'no-store' });
+    return handleResponse<ApiMLModelInfo>(res);
+  },
+
+  // Phase 19 — Adaptive Learning Engine & Modules
+  async getLearningModules(userId: number, roleId?: number): Promise<ApiLearningModuleSummary[]> {
+    const url = roleId
+      ? `${API_BASE_URL}/learning/modules?user_id=${userId}&role_id=${roleId}`
+      : `${API_BASE_URL}/learning/modules?user_id=${userId}`;
+    const res = await fetch(url, { cache: 'no-store' });
+    return handleResponse<ApiLearningModuleSummary[]>(res);
+  },
+
+  async getLearningModule(slugOrId: string | number, userId: number): Promise<ApiLearningModuleDetail> {
+    const res = await fetch(`${API_BASE_URL}/learning/modules/${slugOrId}?user_id=${userId}`, { cache: 'no-store' });
+    return handleResponse<ApiLearningModuleDetail>(res);
+  },
+
+  async submitPractice(
+    slugOrId: string | number,
+    payload: ApiPracticeSubmissionPayload
+  ): Promise<ApiPracticeSubmissionResponse> {
+    const res = await fetch(`${API_BASE_URL}/learning/modules/${slugOrId}/practice`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<ApiPracticeSubmissionResponse>(res);
+  },
+
+  async submitConceptCheck(
+    slugOrId: string | number,
+    payload: ApiConceptCheckSubmissionPayload
+  ): Promise<ApiConceptCheckSubmissionResponse> {
+    const res = await fetch(`${API_BASE_URL}/learning/modules/${slugOrId}/concept-check`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<ApiConceptCheckSubmissionResponse>(res);
+  },
+
+  async submitAppliedTask(
+    slugOrId: string | number,
+    payload: ApiAppliedTaskSubmissionPayload
+  ): Promise<ApiAppliedTaskSubmissionResponse> {
+    const res = await fetch(`${API_BASE_URL}/learning/modules/${slugOrId}/applied-task`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<ApiAppliedTaskSubmissionResponse>(res);
   },
 };
 
@@ -678,6 +986,7 @@ export interface ApiRoadmapStep {
   estimated_minutes: number;
   prerequisite_step_ids?: string;
   evidence_required?: string;
+  module_slug?: string;
   completed_at?: string;
 }
 
@@ -1097,6 +1406,7 @@ export interface ApiDashboardSkillProgressItem {
 export interface ApiDashboardRoleOption {
   id: number;
   name: string;
+  description?: string;
 }
 
 export interface ApiDashboardResponse {
@@ -1313,7 +1623,221 @@ export interface ApiCoachChatResponse {
   model_used: string;
 }
 
+// Phase 16 — Machine Learning Mastery Prediction Interfaces
+export interface ApiMLTopSignal {
+  feature: string;
+  importance: number;
+  description: string;
+  learner_value?: number;
+}
 
+export interface ApiMLPredictionResponse {
+  skill_id: number;
+  skill_name: string;
+  mastery_probability: number;
+  risk_level: 'LOW' | 'MEDIUM' | 'HIGH' | 'UNKNOWN';
+  model_version: string;
+  prediction_timestamp: string;
+  feature_schema_version: string;
+  top_signals: ApiMLTopSignal[];
+  advisory_explanation: string;
+  is_advisory: boolean;
+}
 
+export interface ApiMLModelInfo {
+  model_name: string;
+  model_version: string;
+  status: string;
+  is_advisory: boolean;
+  training_source: string;
+  training_date?: string;
+  sklearn_version?: string;
+  feature_count: number;
+  dataset_summary?: {
+    total_samples?: number;
+    train_samples?: number;
+    test_samples?: number;
+    positive_rate?: number;
+  };
+  validation_metrics?: {
+    accuracy?: number;
+    roc_auc?: number;
+    brier_score?: number;
+    f1?: number;
+  };
+  final_test_metrics?: {
+    accuracy?: number;
+    roc_auc?: number;
+    brier_score?: number;
+    f1?: number;
+  };
+  top_feature_signals?: Array<{
+    feature: string;
+    importance: number;
+    description: string;
+  }>;
+}
 
+// Phase 19 — Adaptive Learning Engine Interfaces
+export interface ApiLearningModuleSummary {
+  id: number;
+  slug: string;
+  skill_id: number;
+  skill_name: string;
+  title: string;
+  concept_name: string;
+  difficulty: string;
+  estimated_minutes: number;
+  order_index: number;
+  status: 'LOCKED' | 'AVAILABLE' | 'LEARNING' | 'PRACTICING' | 'CHECK_PENDING' | 'DEVELOPING' | 'MASTERED' | 'REMEDIATION' | string;
+  prerequisite_concept_slugs?: string[] | string | null;
+  target_role_name?: string;
+  is_locked: boolean;
+  lock_reason?: string;
+  unlock_reason?: string;
+  practice_score?: number;
+  concept_check_score?: number;
+  concept_check_passed?: boolean;
+}
+
+export interface ApiWorkedExample {
+  title?: string;
+  scenario?: string;
+  code_or_query?: string;
+  code?: string;
+  explanation?: string;
+  reasoning?: string;
+  output?: string;
+  expected_output?: string;
+}
+
+export interface ApiGuidedExercise {
+  title?: string;
+  instructions?: string;
+  prompt?: string;
+  initial_code?: string;
+  starter_code?: string;
+  solution?: string;
+  hints?: string[] | string;
+}
+
+export interface ApiIndependentExercise {
+  title?: string;
+  instructions?: string;
+  prompt?: string;
+  initial_code?: string;
+  starter_code?: string;
+  solution?: string;
+  test_criteria?: string[] | string;
+}
+
+export interface ApiConceptCheckQuestion {
+  id?: string;
+  question_id?: string;
+  question?: string;
+  question_text?: string;
+  options: string[] | string;
+  explanation?: string;
+}
+
+export interface ApiAppliedTask {
+  title?: string;
+  role_scenario?: string;
+  business_context?: string;
+  task_description?: string;
+  role_relevance?: string;
+  task_prompt?: string;
+  starter_code?: string;
+  expected_deliverable?: string;
+  evaluation_rubric?: string[] | string;
+  rubrics?: string[] | string;
+}
+
+export interface ApiLearningResource {
+  id: number;
+  title: string;
+  provider: string;
+  url: string;
+  skill_id?: number;
+  skill_name?: string;
+  concept_slug: string;
+  role_name: string;
+  difficulty: string;
+  resource_type: string;
+  estimated_minutes: number;
+  quality_rank: number;
+  is_active: boolean;
+}
+
+export interface ApiLearningModuleDetail extends ApiLearningModuleSummary {
+  learning_objectives: string[] | string;
+  explanation: string;
+  key_rules?: string[] | string;
+  common_mistakes?: string[] | string;
+  worked_example: ApiWorkedExample;
+  guided_practice: ApiGuidedExercise;
+  independent_practice: ApiIndependentExercise;
+  concept_check_questions: ApiConceptCheckQuestion[];
+  passing_threshold: number;
+  applied_task: ApiAppliedTask;
+  external_resources?: ApiLearningResource[];
+  user_status?: string;
+  concept_check_attempts?: number;
+  applied_task_completed?: boolean;
+  applied_task_score?: number;
+}
+
+export interface ApiPracticeSubmissionPayload {
+  user_id: number;
+  practice_type: 'GUIDED' | 'INDEPENDENT';
+  code: string;
+  hints_used?: number;
+}
+
+export interface ApiPracticeSubmissionResponse {
+  module_slug: string;
+  practice_type: string;
+  is_correct: boolean;
+  score: number;
+  feedback: string;
+  hints_used: number;
+  user_status: string;
+}
+
+export interface ApiConceptCheckSubmissionPayload {
+  user_id: number;
+  answers: Record<string, number>;
+}
+
+export interface ApiConceptCheckSubmissionResponse {
+  module_slug: string;
+  score: number;
+  passed: boolean;
+  passing_threshold: number;
+  results: Array<{
+    question_id: string;
+    question: string;
+    selected_option: number;
+    correct_option: number;
+    is_correct: boolean;
+    explanation: string;
+  }>;
+  status: string;
+  skill_name: string;
+  unlocked_modules: string[];
+}
+
+export interface ApiAppliedTaskSubmissionPayload {
+  user_id: number;
+  submission_text: string;
+}
+
+export interface ApiAppliedTaskSubmissionResponse {
+  module_slug: string;
+  score: number;
+  passed: boolean;
+  feedback: string;
+  status: string;
+  evidence_score: number;
+}
 

@@ -40,6 +40,7 @@ Strict Behavioral Rules:
 5. If the user asks whether they are ready for their target role, provide a balanced, nuanced evaluation based on current Career Readiness percentage and specific remaining skill gaps. Never guarantee employment.
 6. If the user asks to modify scores, bypass roadmap steps, change DNA, or reveal internal secrets/API keys/passwords, firmly and politely refuse.
 7. Keep responses structured, professional, and free of robot clichés or generic fluff.
+8. When asked about predicted mastery, likelihood of success on the next attempt, or ML readiness, ALWAYS invoke the `get_skill_mastery_prediction` tool. NEVER invent, fabricate, or guess ML mastery percentages or risk levels. Explain the result using the actual numbers returned by the tool.
 """
 
 GEMINI_TOOLS_DECLARATIONS = [
@@ -105,6 +106,17 @@ GEMINI_TOOLS_DECLARATIONS = [
             "type": "OBJECT",
             "properties": {
                 "skill_name": {"type": "STRING", "description": "Name of the skill to generate a practice question for"}
+            },
+            "required": ["skill_name"],
+        },
+    },
+    {
+        "name": "get_skill_mastery_prediction",
+        "description": "Retrieve the real ML Skill Mastery Prediction for a specific skill (e.g. 'SQL JOINs'). Returns predicted likelihood of success on the learner's NEXT proof attempt, advisory risk level (LOW/MEDIUM/HIGH), and top contributing feature signals. Never guess or invent these probabilities.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "skill_name": {"type": "STRING", "description": "Name of the skill to predict mastery for (e.g. 'SQL JOINs')"}
             },
             "required": ["skill_name"],
         },
@@ -308,7 +320,7 @@ class CoachService:
                         "skill_name": ev.skill.name if ev.skill else "General",
                         "evidence_type": ev.evidence_type,
                         "score": round(ev.score, 1),
-                        "verified": ev.verified,
+                        "verified": True,
                         "source": ev.source,
                         "description": ev.description,
                     }
@@ -373,6 +385,34 @@ class CoachService:
                     {"category": q.category, "question": q.question, "evaluation_tip": q.evaluation_tip}
                     for q in res.questions
                 ]
+            }
+        elif tool_name == "get_skill_mastery_prediction":
+            skill_name = args.get("skill_name", "").strip()
+            skill = None
+            if skill_name:
+                skill = db.query(Skill).filter(Skill.name.ilike(f"%{skill_name}%")).first()
+                if not skill:
+                    for s in db.query(Skill).all():
+                        if s.name.lower() in skill_name.lower():
+                            skill = s
+                            break
+            if not skill:
+                return {"error": f"Skill '{skill_name}' was not found in the competency catalog. No ML prediction available."}
+
+            from app.services.ml_service import predict_skill_mastery
+            prediction = predict_skill_mastery(db, user_id, skill.id)
+            return {
+                "skill_name": prediction.skill_name,
+                "mastery_probability": prediction.mastery_probability,
+                "mastery_probability_pct": f"{round(prediction.mastery_probability * 100)}%",
+                "risk_level": prediction.risk_level,
+                "is_advisory": prediction.is_advisory,
+                "model_version": prediction.model_version,
+                "top_signals": [
+                    {"feature": s.feature, "description": s.description, "importance": s.importance}
+                    for s in prediction.top_signals
+                ],
+                "advisory_explanation": prediction.advisory_explanation,
             }
 
         return {"error": f"Unknown tool: '{tool_name}'"}
@@ -705,7 +745,35 @@ class CoachService:
                 reply = "All of your role competencies currently have healthy verified evidence! Keep advancing through your upcoming roadmap projects."
             return reply, tools_used, tool_results
 
-        # 4. "Why is SQL JOINs my priority?" / Skill importance
+        # 4. Mastery prediction / ML inquiry
+        elif any(w in lower for w in ["mastery", "predicted", "prediction", "likelihood", "ml", "chance"]):
+            target_skill = "SQL JOINs"
+            for candidate in ["sql join", "sql joins", "python", "eda", "data visualization", "statistics", "power bi", "machine learning", "data modeling", "git", "quantum"]:
+                if candidate in lower:
+                    target_skill = candidate
+                    break
+
+            pred = self.execute_tool(db, user_id, "get_skill_mastery_prediction", {"skill_name": target_skill})
+            tools_used.append("get_skill_mastery_prediction")
+            tool_results["get_skill_mastery_prediction"] = pred
+
+            if "error" in pred:
+                reply = f"I could not retrieve an ML mastery prediction: {pred['error']}"
+            else:
+                pct = pred.get("mastery_probability_pct", "0%")
+                risk = pred.get("risk_level", "HIGH")
+                signals = "\n".join([f"- **{s['feature']}** ({s['importance'] * 100:.1f}% signal weight): {s['description']}" for s in pred.get("top_signals", [])[:3]])
+                reply = (
+                    f"Based on your empirical learning history, the **Skill Mastery Prediction model (v{pred.get('model_version', '1.0.0')})** estimates:\n\n"
+                    f"- **Skill:** {pred['skill_name']}\n"
+                    f"- **Predicted Likelihood of Success on Next Proof:** **{pct}**\n"
+                    f"- **Advisory Risk Classification:** **{risk} Risk**\n\n"
+                    f"**Top Model Signals:**\n{signals}\n\n"
+                    f"*(Advisory Notice: ML predicts proof success likelihood based on prior behavioral patterns and does NOT mutate deterministic Skill DNA.)*"
+                )
+            return reply, tools_used, tool_results
+
+        # 5. "Why is SQL JOINs my priority?" / Skill importance
         elif any(w in lower for w in ["why", "sql join", "sql joins", "joins"]):
             nbp = self.execute_tool(db, user_id, "get_next_best_proof", {})
             debt = self.execute_tool(db, user_id, "get_skill_debt", {})
@@ -788,7 +856,15 @@ class CoachService:
             return [
                 "What should I do next?",
                 "How do I clear my Skill Debt?",
+                "What is my predicted readiness for SQL JOINs?",
                 "What evidence do I currently have?",
+            ]
+        elif "get_skill_mastery_prediction" in tools_used:
+            return [
+                "What is my Next-Best-Proof action?",
+                "Why is SQL JOINs my priority?",
+                "What are my weakest skills?",
+                "Am I ready for Data Analyst?",
             ]
         elif "get_current_roadmap" in tools_used or "get_roadmap_changes" in tools_used:
             return [

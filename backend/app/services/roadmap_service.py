@@ -16,8 +16,12 @@ class RoadmapService:
     def get_user_roadmap(self, db: Session, user_id: int) -> Optional[Roadmap]:
         """
         Fetch the active dynamic roadmap for the user.
-        Generates one if none currently exists.
+        Generates or rebuilds if none exists or if learner's target role has changed.
         """
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return None
+
         roadmap = (
             db.query(Roadmap)
             .options(
@@ -27,15 +31,17 @@ class RoadmapService:
             .filter(Roadmap.user_id == user_id, Roadmap.status == "active")
             .first()
         )
-        if not roadmap:
-            return self.generate_dynamic_roadmap(db, user_id)
+        if not roadmap or (user.target_role_id and roadmap.target_role_id != user.target_role_id):
+            return self.generate_dynamic_roadmap(db, user_id, user.target_role_id)
         return roadmap
 
-    def rebuild_user_roadmap(self, db: Session, user_id: int) -> Optional[Roadmap]:
+    def rebuild_user_roadmap(
+        self, db: Session, user_id: int, role_id: Optional[int] = None
+    ) -> Optional[Roadmap]:
         """
         Explicitly triggers dynamic rebuild of learner's roadmap.
         """
-        return self.generate_dynamic_roadmap(db, user_id)
+        return self.generate_dynamic_roadmap(db, user_id, role_id)
 
     def generate_dynamic_roadmap(
         self, db: Session, user_id: int, role_id: Optional[int] = None
@@ -155,6 +161,7 @@ class RoadmapService:
                 estimated_minutes=st["estimated_minutes"],
                 prerequisite_step_ids=st.get("prerequisite_step_ids"),
                 evidence_required=st.get("evidence_required"),
+                module_slug=st.get("module_slug"),
                 completed_at=datetime.fromisoformat(st["completed_at"]) if st.get("completed_at") else None,
             )
             db.add(new_step)

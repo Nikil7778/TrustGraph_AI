@@ -17,7 +17,14 @@ class UserService:
         )
 
     def get_user_by_email(self, db: Session, email: str) -> Optional[User]:
-        return db.query(User).filter(User.email == email).first()
+        if not email:
+            return None
+        return (
+            db.query(User)
+            .options(joinedload(User.target_role))
+            .filter(User.email.ilike(email.strip()))
+            .first()
+        )
 
     def get_all_users(self, db: Session) -> List[User]:
         return (
@@ -49,18 +56,20 @@ class UserService:
         # Initialize UserSkill records for all existing skills in database
         skills = db.query(Skill).all()
         for s in skills:
-            us = UserSkill(
-                user_id=user.id,
-                skill_id=s.id,
-                skill_level=0.0,
-                confidence=0.0,
-                accuracy=0.0,
-                difficulty=user_in.experience_level or "Intermediate",
-                recency="Not assessed yet",
-                evidence_score=0.0,
-                last_assessed_at=datetime.utcnow(),
-            )
-            db.add(us)
+            existing_us = db.query(UserSkill).filter_by(user_id=user.id, skill_id=s.id).first()
+            if not existing_us:
+                us = UserSkill(
+                    user_id=user.id,
+                    skill_id=s.id,
+                    skill_level=0.0,
+                    confidence=0.0,
+                    accuracy=0.0,
+                    difficulty=user_in.experience_level or "Intermediate",
+                    recency="Not assessed yet",
+                    evidence_score=0.0,
+                    last_assessed_at=datetime.utcnow(),
+                )
+                db.add(us)
         db.commit()
 
         # Re-fetch user with target role relationship populated
@@ -71,10 +80,13 @@ class UserService:
         if not user:
             return None
         
+        role_changed = False
         if user_in.target_role_id is not None:
             role = db.query(Role).filter(Role.id == user_in.target_role_id).first()
             if not role:
                 raise ValueError(f"Target role with ID {user_in.target_role_id} does not exist.")
+            if user.target_role_id != user_in.target_role_id:
+                role_changed = True
 
         update_data = user_in.model_dump(exclude_unset=True)
         for field, value in update_data.items():
@@ -82,6 +94,13 @@ class UserService:
 
         db.commit()
         db.refresh(user)
+
+        # Dynamic Role-Based Roadmap Rebuild (Phase 20)
+        # When target role changes, immediately recalculate personalized roadmap and learning pathway
+        if role_changed:
+            from app.services.roadmap_service import roadmap_service
+            roadmap_service.rebuild_user_roadmap(db, user_id, user.target_role_id)
+
         return user
 
     def get_user_skills(self, db: Session, user_id: int) -> List[UserSkill]:

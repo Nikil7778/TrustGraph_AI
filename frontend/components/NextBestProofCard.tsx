@@ -22,6 +22,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { SkillStatusBadge } from './SkillStatusBadge';
+import { NextProofReadiness } from './NextProofReadiness';
 
 interface NextBestProofCardProps {
   proof?: ApiNextBestProof | null;
@@ -34,7 +35,7 @@ export const NextBestProofCard: React.FC<NextBestProofCardProps> = ({
   action,
   onStartAction,
 }) => {
-  const { completeProof } = useLearner();
+  const { completeProof, activeUserId } = useLearner();
   const [showWhyThis, setShowWhyThis] = useState<boolean>(false);
   const [showPracticeModal, setShowPracticeModal] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -162,6 +163,14 @@ export const NextBestProofCard: React.FC<NextBestProofCardProps> = ({
                 <span>Action:</span>
                 <span className="text-blue-700 font-extrabold">{title}</span>
               </div>
+              <div className="pt-1">
+                <NextProofReadiness
+                  userId={proof?.user_id || activeUserId || 1}
+                  skillId={proof?.skill_id || 3}
+                  skillName={skillName}
+                  compact={true}
+                />
+              </div>
             </div>
 
             {/* Metric grid */}
@@ -213,6 +222,7 @@ export const NextBestProofCard: React.FC<NextBestProofCardProps> = ({
           <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
             <button
               onClick={() => setShowWhyThis(!showWhyThis)}
+              aria-expanded={showWhyThis}
               className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-md transition-colors border border-slate-200 self-start sm:self-auto cursor-pointer"
             >
               <HelpCircle className="w-4 h-4 text-slate-500" />
@@ -249,7 +259,7 @@ export const NextBestProofCard: React.FC<NextBestProofCardProps> = ({
                     if (nextState && !aiExplanation) {
                       setIsLoadingAI(true);
                       api.explainDecision({
-                        user_id: proof?.user_id || 1,
+                        user_id: proof?.user_id || activeUserId || 1,
                         target_role: proof?.role_name || 'Data Analyst',
                         skill_name: skillName,
                         context_type: 'NEXT_BEST_PROOF',
@@ -369,8 +379,21 @@ export const NextBestProofCard: React.FC<NextBestProofCardProps> = ({
                   </span>
                 </div>
               )}
-                </>
-              )}
+
+              {/* Supporting Next-Proof Readiness Context */}
+              <div className="pt-2 border-t border-slate-200 space-y-1">
+                <NextProofReadiness
+                  userId={proof?.user_id || activeUserId || 1}
+                  skillId={proof?.skill_id || 3}
+                  skillName={skillName}
+                  showExplainable={true}
+                />
+                <p className="text-[10px] text-slate-500 italic">
+                  The deterministic Next-Best-Proof recommendation remains authoritative. The ML readiness estimate is supporting advisory context only.
+                </p>
+              </div>
+            </>
+          )}
             </div>
           )}
         </div>

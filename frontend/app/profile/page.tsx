@@ -3,27 +3,53 @@
 import React, { useState, useEffect } from 'react';
 import { AppShell } from '../../components/AppShell';
 import { useLearner } from '../../context/LearnerContext';
+import { api, ApiRole } from '../../services/api';
 import { Target, CheckCircle2, Save, User, Mail, Clock, Briefcase, Sparkles } from 'lucide-react';
 
 export default function ProfilePage() {
-  const { activeUser, isDemoMode, updateTargetRole } = useLearner();
+  const { activeUser, updateTargetRole } = useLearner();
 
-  const [name, setName] = useState<string>('Alex Mercer');
-  const [email, setEmail] = useState<string>('alex.mercer@example.com');
+  const [name, setName] = useState<string>('');
+  const [email, setEmail] = useState<string>('');
   const [experienceLevel, setExperienceLevel] = useState<string>('Intermediate');
   const [targetRoleId, setTargetRoleId] = useState<number>(1);
-  const [weeklyHours, setWeeklyHours] = useState<number>(10);
-  const [learningGoal, setLearningGoal] = useState<string>('Transition to Senior Data Analyst position');
+  const [availableRoles, setAvailableRoles] = useState<{ id: number; name: string }[]>([
+    { id: 2, name: 'Data Scientist' },
+    { id: 5, name: 'Python Developer' },
+    { id: 1, name: 'Data Analyst' },
+  ]);
+  const [weeklyHours, setWeeklyHours] = useState<number>(8);
+  const [learningGoal, setLearningGoal] = useState<string>('Get my first Data/AI job');
   const [isSaved, setIsSaved] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
   useEffect(() => {
+    let mounted = true;
+    api.getRoles().then((roles: ApiRole[]) => {
+      if (mounted && roles && roles.length > 0) {
+        const supported = [
+          roles.find((r) => r.id === 2 || r.name === 'Data Scientist') || { id: 2, name: 'Data Scientist' },
+          roles.find((r) => r.id === 5 || r.name === 'Python Developer') || { id: 5, name: 'Python Developer' },
+          roles.find((r) => r.id === 1 || r.name === 'Data Analyst') || { id: 1, name: 'Data Analyst' },
+        ];
+        if (activeUser?.target_role_id === 9) {
+          supported.push({ id: 9, name: 'Analytics Engineer (Preserved)' });
+        }
+        setAvailableRoles(supported);
+      }
+    }).catch(() => null);
+    return () => {
+      mounted = false;
+    };
+  }, [activeUser?.target_role_id]);
+
+  useEffect(() => {
     if (activeUser) {
-      setName(activeUser.name || 'Alex Mercer');
-      setEmail(activeUser.email || 'alex.mercer@example.com');
+      setName(activeUser.name || '');
+      setEmail(activeUser.email || '');
       setExperienceLevel(activeUser.experience_level || 'Intermediate');
-      setWeeklyHours(activeUser.weekly_learning_hours || 10);
-      setLearningGoal(activeUser.learning_goal || 'Transition to Senior Data Analyst position');
+      setWeeklyHours(activeUser.weekly_learning_hours || 8);
+      setLearningGoal(activeUser.learning_goal || 'Get my first Data/AI job');
       if (activeUser.target_role_id) {
         setTargetRoleId(activeUser.target_role_id);
       }
@@ -35,6 +61,15 @@ export default function ProfilePage() {
     setIsSaving(true);
     setIsSaved(false);
     try {
+      if (activeUser?.id) {
+        await api.updateUser(activeUser.id, {
+          name,
+          experience_level: experienceLevel,
+          weekly_learning_hours: weeklyHours,
+          learning_goal: learningGoal,
+          target_role_id: targetRoleId,
+        });
+      }
       if (targetRoleId && updateTargetRole) {
         await updateTargetRole(targetRoleId);
       }
@@ -63,18 +98,15 @@ export default function ProfilePage() {
           {/* Top user summary strip */}
           <div className="flex items-center gap-4 pb-4 border-b border-slate-100">
             <div className="w-14 h-14 rounded-full bg-slate-900 text-white font-bold text-lg flex items-center justify-center shrink-0 shadow-xs">
-              {name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
+              {name ? name.split(' ').map((n) => n[0]).join('').slice(0, 2) : 'NA'}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-slate-900">{name}</h3>
-                {isDemoMode && (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
-                    Active Learner
-                  </span>
-                )}
+                <h3 className="text-base font-bold text-slate-900">{name || 'Learner'}</h3>
               </div>
-              <p className="text-xs text-slate-500">{email} • {experienceLevel} Level</p>
+              <p className="text-xs text-slate-500">
+                {email} • {activeUser?.target_role?.name || 'Analytics Engineer'} • {experienceLevel}
+              </p>
             </div>
           </div>
 
@@ -103,8 +135,8 @@ export default function ProfilePage() {
                 id="learner-email"
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white text-xs"
+                disabled
+                className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-md text-slate-600 text-xs cursor-not-allowed"
                 placeholder="learner@example.com"
               />
             </div>
@@ -135,11 +167,13 @@ export default function ProfilePage() {
                 id="target-role"
                 value={targetRoleId}
                 onChange={(e) => setTargetRoleId(parseInt(e.target.value, 10))}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white text-xs cursor-pointer"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-md text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white text-xs cursor-pointer font-medium"
               >
-                <option value={1}>Data Analyst</option>
-                <option value={2}>Analytics Engineer</option>
-                <option value={3}>Data Scientist</option>
+                {availableRoles.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
               </select>
             </div>
 

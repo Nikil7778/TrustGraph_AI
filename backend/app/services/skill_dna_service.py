@@ -43,6 +43,8 @@ class SkillDNAService:
         )
 
         user_diff_label = user_skill.difficulty if user_skill else "Intermediate"
+        existing_lvl = user_skill.skill_level if user_skill else None
+        existing_ev_score = user_skill.evidence_score if user_skill else None
 
         dna = skill_dna_engine.compute_skill_dna(
             user_id=user_id,
@@ -51,6 +53,8 @@ class SkillDNAService:
             skill_category=skill.category,
             evidences=evidences,
             user_skill_difficulty=user_diff_label,
+            existing_skill_level=existing_lvl,
+            existing_evidence_score=existing_ev_score,
         )
 
         # Update or create UserSkill DB record

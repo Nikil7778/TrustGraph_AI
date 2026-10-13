@@ -28,6 +28,8 @@ export default function RoadmapPage() {
     activeUserId,
     activeUser,
     roadmap,
+    userEvidence,
+    skillDebts,
     rebuildRoadmap,
     isDemoMode,
   } = useLearner();
@@ -36,9 +38,18 @@ export default function RoadmapPage() {
   const [showDetails, setShowDetails] = useState<boolean>(true);
   const [history, setHistory] = useState<ApiRoadmapHistory[]>([]);
 
-  const targetRoleName = isDemoMode
-    ? 'Data Analyst'
-    : activeUser?.target_role?.name || roadmap?.target_role_name || 'Data Analyst';
+  const targetRoleName =
+    activeUser?.target_role?.name || roadmap?.target_role_name || 'Data Analyst';
+
+  const isUnassessed = userEvidence.length === 0;
+  const activeStep =
+    roadmap?.steps.find(
+      (s) => s.status === 'IN_PROGRESS' || s.status === 'RECOMMENDED'
+    ) || roadmap?.steps[0];
+  const completedCount =
+    roadmap?.steps.filter((s) => s.status === 'COMPLETED').length || 0;
+  const totalSteps = roadmap?.steps.length || 0;
+  const hasSkillDebt = skillDebts.some((d) => d.debt_status === 'SKILL_DEBT');
 
   useEffect(() => {
     if (!activeUserId) return;
@@ -67,7 +78,7 @@ export default function RoadmapPage() {
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Roadmap</h1>
               <span className="text-[11px] font-mono text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                v3.2 Adaptive Graph
+                v{roadmap?.version || (isUnassessed ? 1 : '3.2')} Adaptive Graph
               </span>
             </div>
             <p className="text-xs text-slate-500 italic mt-0.5">
@@ -78,7 +89,7 @@ export default function RoadmapPage() {
           <div className="flex items-center gap-2 self-start sm:self-auto">
             <span className="text-xs font-semibold text-blue-900 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-full shadow-2xs inline-flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
-              <span>Target: {targetRoleName} • 68% Career Readiness</span>
+              <span>Target: {targetRoleName} • {isUnassessed ? 'Not assessed' : '68% Career Readiness'}</span>
             </span>
 
             <button
@@ -93,15 +104,17 @@ export default function RoadmapPage() {
         </div>
 
         {/* ========================================================================= */}
-        {/* 2. ADAPTIVE RE-ROUTE BANNER (Matches Stitch Screenshot 4)                 */}
+        {/* 2. ADAPTIVE RE-ROUTE BANNER                                               */}
         {/* ========================================================================= */}
         <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 shadow-xs space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-blue-600 shrink-0" />
-              <h3 className="text-sm font-bold text-slate-900">Why did my roadmap change?</h3>
+              <h3 className="text-sm font-bold text-slate-900">
+                {isUnassessed ? 'Onboarding & Diagnostic Sequence' : 'Why did my roadmap change?'}
+              </h3>
               <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
-                • Adaptive Re-route - Yesterday at 16:42
+                {isUnassessed ? '• Baseline Setup' : '• Adaptive Re-route - Yesterday at 16:42'}
               </span>
             </div>
 
@@ -117,21 +130,21 @@ export default function RoadmapPage() {
           {showDetails && (
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1 text-xs text-slate-600 border-t border-slate-100">
               <p className="max-w-2xl leading-relaxed">
-                Based on recent query execution in the{' '}
-                <strong className="text-slate-900">Retail Analytics Lab</strong>, the adaptive engine inserted a targeted remediation ({' '}
-                <strong className="text-blue-700">SQL JOIN Rescue Practice</strong> ) before unlocking downstream Exploratory Data Analysis.
+                {isUnassessed
+                  ? 'Complete your baseline diagnostic assessment to evaluate your competencies, build your Skill DNA, and generate your personalized learning path.'
+                  : 'Based on recent query execution in the Retail Analytics Lab, the adaptive engine inserted a targeted remediation (SQL JOIN Rescue Practice) before unlocking downstream Exploratory Data Analysis.'}
               </p>
 
               <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 inline-flex items-center gap-1 shrink-0 self-start sm:self-auto">
                 <Zap className="w-3 h-3 text-emerald-600" />
-                <span>Saved ~6.2 hrs downstream rework</span>
+                <span>{isUnassessed ? 'Est. 20 min diagnostic' : 'Saved ~6.2 hrs downstream rework'}</span>
               </span>
             </div>
           )}
         </div>
 
         {/* ========================================================================= */}
-        {/* 3. 3-CARD METRIC STRIP (Matches Stitch Screenshot 4)                      */}
+        {/* 3. 3-CARD METRIC STRIP                                                    */}
         {/* ========================================================================= */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
           {/* Card 1: Verified Evidence */}
@@ -141,7 +154,10 @@ export default function RoadmapPage() {
                 VERIFIED EVIDENCE
               </span>
               <span className="text-lg font-black text-slate-900 mt-0.5 block">
-                2 <span className="text-slate-400 font-normal text-xs">/ 10 Milestones</span>
+                {completedCount}{' '}
+                <span className="text-slate-400 font-normal text-xs">
+                  / {totalSteps} Milestones
+                </span>
               </span>
             </div>
             <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
@@ -156,7 +172,7 @@ export default function RoadmapPage() {
                 CURRENT FOCUS
               </span>
               <span className="text-sm font-bold text-blue-900 mt-0.5 block truncate max-w-[150px]">
-                Relational Multi-Table
+                {activeStep?.title || 'Diagnostic Assessment'}
               </span>
             </div>
             <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
@@ -170,11 +186,11 @@ export default function RoadmapPage() {
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
                 INTERVENTION STATE
               </span>
-              <span className="text-sm font-bold text-rose-700 mt-0.5 block">
-                Active Drill
+              <span className={`text-sm font-bold mt-0.5 block ${hasSkillDebt ? 'text-rose-700' : 'text-slate-800'}`}>
+                {isUnassessed ? 'Onboarding' : hasSkillDebt ? 'Active Drill' : 'Standard Path'}
               </span>
             </div>
-            <div className="w-8 h-8 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${hasSkillDebt ? 'bg-rose-50 text-rose-600' : 'bg-blue-50 text-blue-600'}`}>
               <AlertTriangle className="w-4 h-4" />
             </div>
           </div>
@@ -184,165 +200,141 @@ export default function RoadmapPage() {
         {/* 4. VERTICAL TIMELINE / ROADMAP FLOW (Matches Stitch Screenshot 4)         */}
         {/* ========================================================================= */}
         <div className="relative pl-6 sm:pl-8 space-y-6 before:absolute before:left-3 sm:before:left-4 before:top-4 before:bottom-4 before:w-0.5 before:bg-slate-200">
-          {/* STEP 01: Python Fundamentals (Completed) */}
-          <div className="relative">
-            <div className="absolute -left-6 sm:-left-8 top-3.5 w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 ring-4 ring-slate-50">
-              <CheckCircle2 className="w-4 h-4" />
-            </div>
-            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-2">
-              <div className="flex items-center justify-between text-xs flex-wrap gap-2">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  STEP 01 • FOUNDATION • COMPLETED MAY 12
-                </span>
-                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                  • Verified (Level 85)
-                </span>
-              </div>
-              <h3 className="text-base font-bold text-slate-900">Python Fundamentals</h3>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Vectorized manipulation (Pandas &amp; NumPy), exploratory syntax, filtering algorithms, and deterministic data shaping routines.
-              </p>
-              <div className="flex items-center gap-4 pt-2 text-[11px] text-slate-400">
-                <span>4 Projects Evaluated</span>
-                <span>•</span>
-                <span>100% Mastery Retention</span>
-              </div>
-            </div>
-          </div>
+          {roadmap?.steps && roadmap.steps.length > 0 ? (
+            roadmap.steps.map((step) => {
+              const isCompleted = step.status === 'COMPLETED';
+              const isCurrent =
+                step.status === 'IN_PROGRESS' || step.status === 'RECOMMENDED';
 
-          {/* STEP 02: SQL Query Foundations (Completed) */}
-          <div className="relative">
-            <div className="absolute -left-6 sm:-left-8 top-3.5 w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 ring-4 ring-slate-50">
-              <CheckCircle2 className="w-4 h-4" />
-            </div>
-            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-2">
-              <div className="flex items-center justify-between text-xs flex-wrap gap-2">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  STEP 02 • FOUNDATION • COMPLETED MAY 24
-                </span>
-                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                  • Verified (Level 76)
-                </span>
-              </div>
-              <h3 className="text-base font-bold text-slate-900">SQL Query Foundations</h3>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Core SELECT queries, groupbys, filtering, CASE expressions, and aggregation logic across dimensional transactional schemata.
-              </p>
-              <div className="flex items-center gap-4 pt-2 text-[11px] text-slate-400">
-                <span>28 Queries Executed</span>
-                <span>•</span>
-                <span>92% Execution Speed</span>
-              </div>
-            </div>
-          </div>
+              if (isCompleted) {
+                return (
+                  <div key={step.id} className="relative">
+                    <div className="absolute -left-6 sm:-left-8 top-3.5 w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 ring-4 ring-slate-50">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </div>
+                    <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-2">
+                      <div className="flex items-center justify-between text-xs flex-wrap gap-2">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          STEP {step.order_index < 10 ? `0${step.order_index}` : step.order_index} • {step.step_type} • COMPLETED
+                        </span>
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                          • Verified
+                        </span>
+                      </div>
+                      <h3 className="text-base font-bold text-slate-900">{step.title}</h3>
+                      {step.reason && (
+                        <p className="text-xs text-slate-500 leading-relaxed">{step.reason}</p>
+                      )}
+                      <div className="flex items-center gap-4 pt-2 text-[11px] text-slate-400">
+                        <span>{step.skill_name || 'Core Competency'}</span>
+                        <span>•</span>
+                        <span>Mastery Verified</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
 
-          {/* STEP 03: SQL JOIN Rescue Practice (Active / Dynamically Inserted) */}
-          <div className="relative">
-            <div className="absolute -left-6 sm:-left-8 top-3.5 w-6 h-6 rounded-md bg-blue-800 text-white flex items-center justify-center shrink-0 ring-4 ring-slate-50 shadow-xs">
-              <Play className="w-3.5 h-3.5 fill-white" />
-            </div>
-            <div className="bg-white border-2 border-blue-600/80 rounded-xl p-5 shadow-xs space-y-3">
-              <div className="flex items-center justify-between text-xs flex-wrap gap-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
-                    • STEP 03 • DYNAMICALLY INSERTED
-                  </span>
-                  <span className="text-[10px] font-bold text-white bg-blue-800 px-2 py-0.5 rounded">
-                    CURRENT FOCUS
-                  </span>
+              if (isCurrent) {
+                return (
+                  <div key={step.id} className="relative">
+                    <div className="absolute -left-6 sm:-left-8 top-3.5 w-6 h-6 rounded-md bg-blue-800 text-white flex items-center justify-center shrink-0 ring-4 ring-slate-50 shadow-xs">
+                      <Play className="w-3.5 h-3.5 fill-white" />
+                    </div>
+                    <div className="bg-white border-2 border-blue-600/80 rounded-xl p-5 shadow-xs space-y-3">
+                      <div className="flex items-center justify-between text-xs flex-wrap gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                            • STEP {step.order_index < 10 ? `0${step.order_index}` : step.order_index} • {step.step_type}
+                          </span>
+                          <span className="text-[10px] font-bold text-white bg-blue-800 px-2 py-0.5 rounded">
+                            CURRENT FOCUS
+                          </span>
+                        </div>
+                        <span className="text-xs text-slate-500 font-mono flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-slate-400" />
+                          <span>Est. {step.estimated_minutes} min</span>
+                        </span>
+                      </div>
+
+                      <div>
+                        <h3 className="text-lg font-bold text-slate-900">{step.title}</h3>
+                        <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                          {step.reason ||
+                            (isUnassessed
+                              ? 'Baseline diagnostic assessment to baseline your skills and build your personalized skill graph.'
+                              : 'Targeted learning milestone to reach job qualification.')}
+                        </p>
+                      </div>
+
+                      <div className="pt-2 flex items-center gap-3">
+                        <button
+                          onClick={() => {
+                            if (step.module_slug) {
+                              router.push(`/learn/${step.module_slug}`);
+                            } else if (
+                              step.step_type === 'ASSESSMENT' ||
+                              step.title.toLowerCase().includes('assessment')
+                            ) {
+                              router.push('/assessments');
+                            } else if (step.step_type === 'PROJECT') {
+                              router.push('/projects');
+                            } else {
+                              router.push('/practice-lab');
+                            }
+                          }}
+                          className="px-4 py-2 bg-blue-800 hover:bg-blue-900 text-white font-semibold text-xs rounded-md shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <span>
+                            {step.module_slug
+                              ? 'Enter Learning Module'
+                              : step.step_type === 'ASSESSMENT' || step.title.toLowerCase().includes('assessment')
+                              ? 'Start Assessment'
+                              : 'Start Practice'}
+                          </span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div key={step.id} className="relative">
+                  <div className="absolute -left-6 sm:-left-8 top-3.5 w-6 h-6 rounded-full bg-white border border-slate-300 text-slate-500 font-mono text-[10px] font-bold flex items-center justify-center shrink-0 ring-4 ring-slate-50">
+                    {step.order_index < 10 ? `0${step.order_index}` : step.order_index}
+                  </div>
+                  <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-2 opacity-85">
+                    <div className="flex items-center justify-between text-xs flex-wrap gap-2">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                        STEP {step.order_index < 10 ? `0${step.order_index}` : step.order_index} • {step.step_type} • {step.status === 'BLOCKED' ? 'LOCKED' : 'UPCOMING'}
+                      </span>
+                      <span className="text-xs text-slate-400 font-mono flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-slate-400" />
+                        <span>Est. {step.estimated_minutes} min</span>
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-base font-bold text-slate-800">{step.title}</h3>
+                      {step.module_slug && (
+                        <button
+                          onClick={() => router.push(`/learn/${step.module_slug}`)}
+                          className="text-xs font-semibold text-blue-700 hover:text-blue-900 inline-flex items-center gap-1 cursor-pointer"
+                        >
+                          <span>View Module</span>
+                          <ArrowRight className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      {step.reason || 'Upcoming competency block in career path.'}
+                    </p>
+                  </div>
                 </div>
-                <span className="text-xs text-slate-500 font-mono flex items-center gap-1">
-                  <Clock className="w-3 h-3 text-slate-400" />
-                  <span>Est. 35 min</span>
-                </span>
-              </div>
-
-              <div>
-                <h3 className="text-lg font-bold text-slate-900">SQL JOIN Rescue Practice</h3>
-                <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                  Targeted drill resolving relational multi-table JOIN gaps and Cartesian anomalies detected during live task execution. Re-calibrates self-joins, full outer joins, and complex NULL predicates.
-                </p>
-              </div>
-
-              {/* Diagnostic Gap Progress Box */}
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-1.5 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-700">Diagnostic Gap Progress</span>
-                  <span className="text-[11px] font-semibold text-slate-600">
-                    Current: <strong className="text-rose-600">42%</strong> / Target: 75% accuracy
-                  </span>
-                </div>
-                <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
-                  <div className="bg-rose-600 h-full rounded-full" style={{ width: '42%' }} />
-                </div>
-                <div className="flex items-center justify-between text-[10px] text-slate-400 pt-0.5">
-                  <span>Cartesian product mismatch in retail cohort queries</span>
-                  <span>Threshold to unlock Step 04</span>
-                </div>
-              </div>
-
-              <div className="pt-2 flex items-center gap-3">
-                <button
-                  onClick={() => router.push('/practice-lab')}
-                  className="px-4 py-2 bg-blue-800 hover:bg-blue-900 text-white font-semibold text-xs rounded-md shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
-                >
-                  <span>Start Practice</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-
-                <button
-                  onClick={() => router.push('/skill-debt')}
-                  className="px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 border border-slate-200 rounded-md transition-colors cursor-pointer"
-                >
-                  <span>View Diagnostic Gap</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* STEP 04: Multi-Table Challenge Lab (Upcoming / Locked) */}
-          <div className="relative">
-            <div className="absolute -left-6 sm:-left-8 top-3.5 w-6 h-6 rounded-full bg-white border border-slate-300 text-slate-500 font-mono text-[10px] font-bold flex items-center justify-center shrink-0 ring-4 ring-slate-50">
-              04
-            </div>
-            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-2 opacity-90">
-              <div className="flex items-center justify-between text-xs flex-wrap gap-2">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  STEP 04 • UPCOMING (UNLOCKS AFTER RESCUE)
-                </span>
-                <span className="text-xs text-slate-400 font-mono flex items-center gap-1">
-                  <Clock className="w-3 h-3 text-slate-400" />
-                  <span>Est. 45 min</span>
-                </span>
-              </div>
-              <h3 className="text-base font-bold text-slate-800">Multi-Table Challenge Lab</h3>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Complex relational datasets with missing foreign keys and dirty attributes. Exercises focus on resilient table coupling and windowed aggregate transforms.
-              </p>
-            </div>
-          </div>
-
-          {/* STEP 05: Retail Customer Analytics Lab (Upcoming) */}
-          <div className="relative">
-            <div className="absolute -left-6 sm:-left-8 top-3.5 w-6 h-6 rounded-full bg-white border border-slate-300 text-slate-500 font-mono text-[10px] font-bold flex items-center justify-center shrink-0 ring-4 ring-slate-50">
-              05
-            </div>
-            <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-2 opacity-80">
-              <div className="flex items-center justify-between text-xs flex-wrap gap-2">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  STEP 05 • REAL-WORLD PROOF
-                </span>
-                <span className="text-xs text-slate-400 font-mono flex items-center gap-1">
-                  <Clock className="w-3 h-3 text-slate-400" />
-                  <span>Est. 1h 15m</span>
-                </span>
-              </div>
-              <h3 className="text-base font-bold text-slate-800">Retail Customer Analytics Lab</h3>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                End-to-end live transactions analysis and customer lifetime value pipeline under real-world schema conditions.
-              </p>
-            </div>
-          </div>
+              );
+            })
+          ) : null}
         </div>
       </div>
     </AppShell>

@@ -29,9 +29,7 @@ export default function CareerGapPage() {
   const [aiCareerExplanation, setAiCareerExplanation] = useState<ApiAIExplainDecisionResponse | null>(null);
   const [isLoadingAICareer, setIsLoadingAICareer] = useState<boolean>(false);
 
-  const targetRoleName = isDemoMode
-    ? 'Data Analyst'
-    : activeUser?.target_role?.name || 'Data Analyst';
+  const targetRoleName = activeUser?.target_role?.name || 'Data Analyst';
 
   const handleSelectSkill = async (skill: ApiCareerValue) => {
     setSelectedSkill(skill);
@@ -77,6 +75,7 @@ export default function CareerGapPage() {
   };
 
   const topPrioritySkill = careerValues[0] || null;
+  const isUnassessed = careerValues.length === 0 || careerValues.every((cv) => cv.current_skill_level === 0);
 
   return (
     <AppShell>
@@ -116,23 +115,27 @@ export default function CareerGapPage() {
           <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
               <div>
-                <span className="text-[10px] font-bold tracking-wider px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 inline-flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-rose-600" />
-                  HIGHEST PRIORITY GAP • RANK #1
+                <span className={`text-[10px] font-bold tracking-wider px-2.5 py-0.5 rounded-full inline-flex items-center gap-1.5 ${isUnassessed ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${isUnassessed ? 'bg-blue-600' : 'bg-rose-600'}`} />
+                  {isUnassessed ? 'PRIMARY BENCHMARK COMPETENCY' : 'HIGHEST PRIORITY GAP • RANK #1'}
                 </span>
                 <h2 className="text-xl font-bold text-slate-900 mt-2 tracking-tight">
                   {topPrioritySkill.skill_name}
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5 max-w-3xl leading-relaxed">
-                  {topPrioritySkill.reason}
+                  {isUnassessed
+                    ? 'Target competency required for job qualification. Complete your diagnostic assessment to identify your current skill standing.'
+                    : topPrioritySkill.reason}
                 </p>
               </div>
 
               <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 sm:text-right shrink-0">
-                <span className="text-2xl font-black text-rose-600">
-                  {Math.round(topPrioritySkill.gap_score)}%
+                <span className={`text-2xl font-black ${isUnassessed ? 'text-slate-700' : 'text-rose-600'}`}>
+                  {isUnassessed ? 'Not assessed' : `${Math.round(topPrioritySkill.gap_score)}%`}
                 </span>
-                <span className="text-xs text-slate-400 block font-medium">Competency Deficit</span>
+                <span className="text-xs text-slate-400 block font-medium">
+                  {isUnassessed ? 'Demonstrated Standing' : 'Competency Deficit'}
+                </span>
               </div>
             </div>
 
@@ -141,10 +144,15 @@ export default function CareerGapPage() {
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-slate-600">
                   <span>Demonstrated Level</span>
-                  <span className="font-bold text-slate-900">{Math.round(topPrioritySkill.current_skill_level)}%</span>
+                  <span className="font-bold text-slate-900">
+                    {isUnassessed ? 'Not assessed' : `${Math.round(topPrioritySkill.current_skill_level)}%`}
+                  </span>
                 </div>
                 <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                  <div className="bg-rose-600 h-full rounded-full" style={{ width: `${Math.round(topPrioritySkill.current_skill_level)}%` }} />
+                  <div
+                    className="bg-rose-600 h-full rounded-full"
+                    style={{ width: isUnassessed ? '0%' : `${Math.round(topPrioritySkill.current_skill_level)}%` }}
+                  />
                 </div>
               </div>
 
@@ -164,14 +172,14 @@ export default function CareerGapPage() {
               <div className="flex items-center gap-3 text-slate-500">
                 <span>Role Importance: <strong className="text-slate-800">{Math.round(topPrioritySkill.role_importance)}%</strong></span>
                 <span>•</span>
-                <span>Career ROI: <strong className="text-slate-800">{Math.round(topPrioritySkill.career_value_score)}/100</strong></span>
+                <span>Target Benchmark: <strong className="text-slate-800">{Math.round(topPrioritySkill.required_skill_level)}%</strong></span>
               </div>
 
               <button
-                onClick={() => router.push('/practice-lab')}
+                onClick={() => router.push(isUnassessed ? '/assessments' : '/practice-lab')}
                 className="px-4 py-2 bg-blue-800 hover:bg-blue-900 text-white font-semibold text-xs rounded-md shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
               >
-                <span>Prove Highest-Priority Gap</span>
+                <span>{isUnassessed ? 'Start Diagnostic Assessment' : 'Prove Highest-Priority Gap'}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -237,15 +245,15 @@ export default function CareerGapPage() {
                       <td className="py-3 px-4">
                         <div className="space-y-1">
                           <div className="flex items-center justify-between text-[11px] text-slate-500 font-mono">
-                            <span>{Math.round(item.current_skill_level)}%</span>
-                            <span>{Math.round(item.required_skill_level)}%</span>
+                            <span>{isUnassessed ? 'Not assessed' : `${Math.round(item.current_skill_level)}%`}</span>
+                            <span>Target {Math.round(item.required_skill_level)}%</span>
                           </div>
                           <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
                             <div
                               className={`h-full rounded-full ${
                                 item.gap_score > 30 ? 'bg-rose-600' : 'bg-blue-700'
                               }`}
-                              style={{ width: `${Math.round(item.current_skill_level)}%` }}
+                              style={{ width: isUnassessed ? '0%' : `${Math.round(item.current_skill_level)}%` }}
                             />
                           </div>
                         </div>

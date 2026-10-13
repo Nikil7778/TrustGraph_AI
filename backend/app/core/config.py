@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "SkillPath AI Backend"
     ENVIRONMENT: str = "development"
     API_V1_STR: str = "/api"
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "skillpath_ai_session_auth_secret_2026")
     
     # Database URL
     DATABASE_URL: str = os.getenv(
@@ -19,12 +20,17 @@ class Settings(BaseSettings):
         f"sqlite:///{BASE_DIR.as_posix()}/skillpath.db"
     )
 
+    # Google OAuth Configuration
+    GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
+    GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
+    GOOGLE_REDIRECT_URI: str = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:3000/login")
+
     # CORS Origins
     CORS_ORIGINS: Union[str, List[str]] = "http://localhost:3000,http://127.0.0.1:3000"
 
-    # Gemini AI Configuration (Phase 11)
+    # Gemini AI Configuration
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
-    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
     GEMINI_TIMEOUT_SECONDS: int = int(os.getenv("GEMINI_TIMEOUT_SECONDS", "15"))
 
     @field_validator("CORS_ORIGINS", mode="before")
