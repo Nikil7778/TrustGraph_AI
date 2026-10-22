@@ -33,8 +33,8 @@ class RoadmapEngine:
         "Model Evaluation": "model-evaluation-metrics",
         # Python Developer skills
         "Python Basics": "python-core-fundamentals",
+        "Data Structures": "python-collections-functions",
         "OOP": "python-oop-architecture",
-        "Data Structures": "python-oop-architecture",
         "Exception Handling": "python-error-handling-robustness",
         "SQL Basics": "sql-fundamentals",
         "HTTP & REST APIs": "rest-api-design-architecture",

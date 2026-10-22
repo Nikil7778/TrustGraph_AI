@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
+import 'katex/dist/katex.min.css';
 import './globals.css';
 import { LearnerProvider } from '../context/LearnerContext';
 import { CoachProvider } from '../context/CoachContext';

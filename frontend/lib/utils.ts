@@ -36,6 +36,18 @@ export function getStatusBadgeStyles(status: SkillStatus) {
   }
 }
 
+/**
+ * Derives avatar initials from a display name.
+ * Examples: "Alex Mercer" → "AM", "Nikil A" → "NA", "John" → "J"
+ * Returns at most 2 uppercase characters.
+ */
+export function getInitials(name: string | null | undefined): string {
+  if (!name || !name.trim()) return '?';
+  const words = name.trim().split(/\s+/);
+  if (words.length === 1) return words[0][0].toUpperCase();
+  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+}
+
 export function getPriorityBadgeStyles(priority: SkillPriority) {
   switch (priority) {
     case 'Critical':

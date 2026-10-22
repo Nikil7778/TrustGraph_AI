@@ -47,6 +47,13 @@ class LearningModule(Base):
     # 5. Applied Task
     applied_task = Column(Text, nullable=False)  # JSON object {role_scenario, task_description, starter_code, rubrics}
 
+    # 6. Comprehensive Structural Extensions (Phase 21)
+    subtopics = Column(Text, nullable=True)  # JSON array of [{"id": "...", "title": "..."}]
+    why_it_matters_by_role = Column(Text, nullable=True)  # JSON dict {"Data Analyst": "...", "Data Scientist": "...", "Python Developer": "..."}
+    code_examples = Column(Text, nullable=True)  # JSON array of [{"title": "...", "language": "...", "code": "...", "explanation": "..."}]
+    quick_reference = Column(Text, nullable=True)  # JSON dict {"key_terms": [...], "formulas_rules": [...], "takeaways": [...]}
+    level_variations = Column(Text, nullable=True)  # JSON dict {"Beginner": {...}, "Advanced": {...}}
+
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
     # Relationships

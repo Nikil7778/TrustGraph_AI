@@ -54,7 +54,7 @@ interface LearnerContextType {
 
 const LearnerContext = createContext<LearnerContextType | undefined>(undefined);
 
-const DEMO_USER_ID = 1; // Alex Mercer demo profile
+const DEMO_USER_ID = 1; // Convenience flag: user #1 is treated as demo mode
 
 export const LearnerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);

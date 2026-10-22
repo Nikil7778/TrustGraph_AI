@@ -67,13 +67,13 @@ def seed_database(db: Session) -> None:
     # A. Data Analyst
     da_role = role_objs["Data Analyst"]
     da_benchmarks = [
-        ("SQL", 90, 85, "Critical"),
-        ("SQL JOINs", 95, 85, "Critical"),
+        ("SQL", 85, 85, "High"),
+        ("SQL JOINs", 90, 80, "High"),
         ("Python", 80, 80, "High"),
         ("Statistics", 75, 75, "Medium"),
         ("EDA", 85, 85, "High"),
-        ("Data Visualization", 90, 85, "Critical"),
-        ("Power BI", 85, 80, "Critical"),
+        ("Data Visualization", 80, 80, "High"),
+        ("Power BI", 75, 70, "High"),
         ("Machine Learning", 30, 40, "Low"),
     ]
 
@@ -135,6 +135,7 @@ def seed_database(db: Session) -> None:
             else:
                 rs.importance_score = importance
                 rs.industry_relevance = ind_rel
+                rs.required_level = required_level
     db.commit()
 
     # 3.1 Seed Predefined Goals from PREDEFINED_GOALS specification
@@ -1043,7 +1044,7 @@ def seed_database(db: Session) -> None:
 
     # 11. Seed Modular Learning Units (Phase 19)
     for mod_data in LEARNING_MODULES_SEED:
-        skill = skill_objs.get(mod_data["skill_name"])
+        skill = skill_objs.get(mod_data["skill_name"]) or db.query(Skill).filter(Skill.name == mod_data["skill_name"]).first()
         if not skill:
             continue
         existing_mod = db.query(LearningModule).filter_by(slug=mod_data["slug"]).first()
@@ -1068,6 +1069,11 @@ def seed_database(db: Session) -> None:
                 concept_check=json.dumps(mod_data["concept_check"]),
                 passing_threshold=75.0,
                 applied_task=json.dumps(mod_data["applied_task"]),
+                subtopics=json.dumps(mod_data["subtopics"]) if mod_data.get("subtopics") else None,
+                why_it_matters_by_role=json.dumps(mod_data["why_it_matters_by_role"]) if mod_data.get("why_it_matters_by_role") else None,
+                code_examples=json.dumps(mod_data["code_examples"]) if mod_data.get("code_examples") else None,
+                quick_reference=json.dumps(mod_data["quick_reference"]) if mod_data.get("quick_reference") else None,
+                level_variations=json.dumps(mod_data["level_variations"]) if mod_data.get("level_variations") else None,
             )
             db.add(new_mod)
         else:
@@ -1087,6 +1093,16 @@ def seed_database(db: Session) -> None:
             existing_mod.guided_practice = json.dumps(mod_data["guided_practice"])
             existing_mod.independent_practice = json.dumps(mod_data["independent_practice"])
             existing_mod.applied_task = json.dumps(mod_data["applied_task"])
+            if mod_data.get("subtopics"):
+                existing_mod.subtopics = json.dumps(mod_data["subtopics"])
+            if mod_data.get("why_it_matters_by_role"):
+                existing_mod.why_it_matters_by_role = json.dumps(mod_data["why_it_matters_by_role"])
+            if mod_data.get("code_examples"):
+                existing_mod.code_examples = json.dumps(mod_data["code_examples"])
+            if mod_data.get("quick_reference"):
+                existing_mod.quick_reference = json.dumps(mod_data["quick_reference"])
+            if mod_data.get("level_variations"):
+                existing_mod.level_variations = json.dumps(mod_data["level_variations"])
     db.commit()
 
     # 12. Seed Authoritative External Learning Resources Registry (Phase 20)
@@ -1138,6 +1154,17 @@ def reset_alex_mercer(db: Session) -> None:
             m.concept_check = json.dumps(mod_data["concept_check"])
             m.guided_practice = json.dumps(mod_data["guided_practice"])
             m.independent_practice = json.dumps(mod_data["independent_practice"])
+            m.explanation = mod_data["explanation"]
+            if mod_data.get("subtopics"):
+                m.subtopics = json.dumps(mod_data["subtopics"])
+            if mod_data.get("why_it_matters_by_role"):
+                m.why_it_matters_by_role = json.dumps(mod_data["why_it_matters_by_role"])
+            if mod_data.get("code_examples"):
+                m.code_examples = json.dumps(mod_data["code_examples"])
+            if mod_data.get("quick_reference"):
+                m.quick_reference = json.dumps(mod_data["quick_reference"])
+            if mod_data.get("level_variations"):
+                m.level_variations = json.dumps(mod_data["level_variations"])
 
     # Delete non-seed assessment attempts, project attempts, and lab attempts
     db.query(AssessmentAttempt).filter_by(user_id=alex.id).delete()
@@ -1207,6 +1234,28 @@ def reset_alex_mercer(db: Session) -> None:
                 us.confidence = conf
                 us.accuracy = acc
                 us.evidence_score = ev_count * 5.0
+
+    # Ensure Data Analyst role benchmarks are set correctly
+    da_role = db.query(Role).filter_by(name="Data Analyst").first()
+    if da_role:
+        da_benchmarks = [
+            ("SQL", 85, 85, "High"),
+            ("SQL JOINs", 90, 80, "High"),
+            ("Python", 80, 80, "High"),
+            ("Statistics", 75, 75, "Medium"),
+            ("EDA", 85, 85, "High"),
+            ("Data Visualization", 80, 80, "High"),
+            ("Power BI", 75, 70, "High"),
+            ("Machine Learning", 30, 40, "Low"),
+        ]
+        for skill_name, importance, required_level, ind_rel in da_benchmarks:
+            sk = db.query(Skill).filter_by(name=skill_name).first()
+            if sk:
+                rs = db.query(RoleSkill).filter_by(role_id=da_role.id, skill_id=sk.id).first()
+                if rs:
+                    rs.importance_score = importance
+                    rs.required_level = required_level
+                    rs.industry_relevance = ind_rel
 
     from app.services.roadmap_service import roadmap_service
     roadmap_service.rebuild_user_roadmap(db, alex.id)

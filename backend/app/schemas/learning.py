@@ -22,6 +22,11 @@ class LearningModuleSummary(BaseModel):
     applied_task_completed: bool = False
     is_locked: bool = False
     unlock_reason: Optional[str] = None
+    level: str = "Beginner"
+    is_rescue: bool = False
+    is_targeted_refresher: bool = False
+    rescue_reason: Optional[str] = None
+    recommended_action_label: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -68,6 +73,15 @@ class LearningModuleDetail(BaseModel):
     explanation: str
     key_rules: Optional[str] = None
     common_mistakes: Optional[str] = None
+
+    # Comprehensive Structural Extensions (Phase 21)
+    subtopics: Optional[List[Dict[str, Any]]] = None
+    why_it_matters_by_role: Optional[Dict[str, str]] = None
+    code_examples: Optional[List[Dict[str, Any]]] = None
+    quick_reference: Optional[Dict[str, Any]] = None
+    level_variations: Optional[Dict[str, Any]] = None
+    adaptive_next_action: Optional[Dict[str, Any]] = None
+    effective_level: Optional[str] = "Intermediate"
 
     worked_example: Dict[str, Any]
     guided_practice: Dict[str, Any]
@@ -150,6 +164,7 @@ class ConceptCheckSubmitResponse(BaseModel):
 
 
 class AppliedTaskSubmitRequest(BaseModel):
+    user_id: Optional[int] = None
     code_or_query: str
     business_rationale: Optional[str] = None
 

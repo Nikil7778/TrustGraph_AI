@@ -73,6 +73,17 @@ def on_startup():
                 q_cols = [c["name"] for c in inspector.get_columns("assessment_questions")]
                 if "skill_id" not in q_cols:
                     conn.execute(text("ALTER TABLE assessment_questions ADD COLUMN skill_id INTEGER REFERENCES skills(id)"))
+            if "learning_modules" in inspector.get_table_names():
+                lm_cols = [c["name"] for c in inspector.get_columns("learning_modules")]
+                for col_name in [
+                    "subtopics",
+                    "why_it_matters_by_role",
+                    "code_examples",
+                    "quick_reference",
+                    "level_variations",
+                ]:
+                    if col_name not in lm_cols:
+                        conn.execute(text(f"ALTER TABLE learning_modules ADD COLUMN {col_name} TEXT"))
             conn.commit()
 
         # Ensure presentation learner and Analytics Engineer role are available

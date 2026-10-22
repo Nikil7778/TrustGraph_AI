@@ -303,39 +303,221 @@ Pandas is built on top of NumPy's contiguous C-level memory buffers. Performing 
         "title": "Applied Statistical Analysis & Hypothesis Testing",
         "concept_name": "Descriptive Statistics, Confidence Intervals & Hypothesis Tests",
         "difficulty": "Intermediate",
-        "estimated_minutes": 30,
+        "estimated_minutes": 35,
         "order_index": 4,
         "prerequisite_concept_slugs": "python-pandas-pipelines",
         "target_role_name": "All",
         "learning_objectives": [
-            "Interpret measures of central tendency, spread, variance, and skewness",
-            "Formulate null ($H_0$) and alternative ($H_1$) hypotheses for business experiments",
-            "Evaluate p-values, significance levels ($\\alpha = 0.05$), and Type I vs. Type II error trade-offs",
+            "Formulate mathematically sound Null ($H_0$) and Alternative ($H_1$) hypotheses for business and machine learning experiments",
+            "Calculate test statistics ($z$-score and $t$-statistic) and interpret p-values against significance thresholds ($\\alpha = 0.05$)",
+            "Distinguish Type I Errors (False Positives) from Type II Errors (False Negatives) and quantify Statistical Power ($1 - \\beta$)",
+            "Select the appropriate statistical test (One-Sample, Independent Two-Sample, Welch's t-test, Paired t-test, or Chi-Square)",
+            "Translate statistical test outcomes into clear executive business decisions and production engineering actions",
         ],
-        "explanation": """### Statistical Rigor in Data Decision-Making
-Data analysts and scientists must distinguish real business signals from random noise. Whether analyzing A/B tests or assessing customer retention improvements, statistical hypothesis testing provides the mathematical foundation.
+        "subtopics": [
+            {"id": "why-needed", "title": "1. Why Hypothesis Testing is Needed"},
+            {"id": "population-sample", "title": "2. Population vs. Sample Parameters"},
+            {"id": "null-hypothesis", "title": "3. Null Hypothesis (H₀)"},
+            {"id": "alternative-hypothesis", "title": "4. Alternative Hypothesis (H₁)"},
+            {"id": "significance-level", "title": "5. Significance Level (α)"},
+            {"id": "test-statistic", "title": "6. Test Statistic Calculation (z & t)"},
+            {"id": "p-value", "title": "7. The P-Value & Decision Rules"},
+            {"id": "errors", "title": "8. Type I and Type II Errors"},
+            {"id": "power", "title": "9. Statistical Power (1 - β)"},
+            {"id": "tails", "title": "10. One-Tailed vs. Two-Tailed Tests"},
+            {"id": "choosing-test", "title": "11. Choosing the Appropriate Test"},
+            {"id": "worked-example", "title": "12. Step-by-Step Worked Business Example"},
+            {"id": "common-mistakes", "title": "13. Common Industry Pitfalls & Fallacies"},
+            {"id": "quick-reference", "title": "14. Quick Reference & Decision Matrix"},
+            {"id": "practice", "title": "15. Guided & Independent Practice"},
+            {"id": "concept-check", "title": "16. Formative Concept Check (5 Questions)"},
+            {"id": "applied-task", "title": "17. Production Real-World Applied Task"},
+            {"id": "resources", "title": "18. Verified External Learning References"},
+        ],
+        "why_it_matters_by_role": {
+            "Data Analyst": "For Data Analysts, hypothesis testing is the bedrock of A/B testing and executive decision-making. When marketing or product managers ask whether a checkout redesign increased conversion by 0.9%, you must determine whether the uplift is a genuine business signal or random noise. Formulating hypotheses and calculating p-values prevents companies from rolling out costly placebo changes.",
+            "Data Scientist": "For Data Scientists, hypothesis testing underpins experimentation, feature selection, and model validation. Before feeding a new feature into a predictive model, statistical significance tests confirm whether the feature exhibits a true population relationship with the target variable rather than spurious correlation. It also governs offline model evaluation and online champion/challenger rollout decisions.",
+            "Python Developer": "For Python Developers building data-intensive applications and backend services, understanding statistical inference is critical for implementing automated validation checks, anomaly detection pipelines, and metrics aggregations. Developers must properly utilize libraries like `scipy.stats` and `statsmodels` without misinterpreting return values or introducing data-leakage bugs in production microservices."
+        },
+        "level_variations": {
+            "Beginner": {
+                "level": "Beginner",
+                "focus": "Core Intuition, Terminology & Courtroom Analogy",
+                "prerequisite_recap": "Starts from fundamental everyday intuition without assuming prior statistics knowledge.",
+                "explanation_supplement": r"""Think of hypothesis testing like a criminal courtroom trial in modern law:
+- **Presumption of Innocence ($H_0$)**: The defendant is presumed innocent until proven guilty.
+- **Prosecution's Claim ($H_1$)**: The defendant committed the crime.
+- **Evidence & Reasonable Doubt ($p$-value & $\alpha$)**: The jury only convicts if evidence makes innocence exceedingly improbable ($p < 0.05$). If evidence is weak, the jury says 'Not Guilty'—they do NOT say 'Innocence is proven'. Similarly, we never say 'The null hypothesis is proven true'; we merely fail to reject it due to insufficient evidence.""",
+                "key_additions": [
+                    "Intuitive mental model: Courtroom trial ($H_0$ = Innocent, $H_1$ = Guilty)",
+                    "Distinguishing the entire population from a smaller sample",
+                    "P-value intuition: small p-value ($p < 0.05$) means evidence is too extreme to be coincidence"
+                ]
+            },
+            "Intermediate": {
+                "level": "Intermediate",
+                "focus": "Mathematical Formulations, Test Selection & Practical Rigor",
+                "prerequisite_recap": "Assumes comfort with sample means, standard deviation, and basic Python data manipulation.",
+                "explanation_supplement": r"""We calculate exact test statistics ($z$-score, $t$-statistic) by comparing observed sample differences against the standard error. We address distribution assumptions: normality, independence, and homogeneity of variance, and learn when to select independent two-sample t-tests vs. Welch's t-test.""",
+                "key_additions": [
+                    r"Welch's t-test when variances are unequal ($equal\_var=False$)",
+                    "Type I error (False Positive) vs. Type II error (False Negative)",
+                    "Statistical significance vs. practical business significance (effect size)"
+                ]
+            },
+            "Advanced": {
+                "level": "Advanced",
+                "focus": "Statistical Power, Effect Size & Multiple Testing Corrections",
+                "prerequisite_recap": "Assumes full fluency in statistical mechanics, A/B testing, and hypothesis formulation.",
+                "explanation_supplement": r"""Advanced inferential statistics requires accounting for statistical power ($1 - \beta$), minimum detectable effect (MDE), and sample size determination before launching experiments. When testing multiple metrics simultaneously, uncorrected alpha inflation guarantees false positives, requiring Family-Wise Error Rate (FWER) Bonferroni or False Discovery Rate (FDR) Benjamini-Hochberg corrections.""",
+                "key_additions": [
+                    r"Power analysis: calculating required sample size given $\alpha$, power $1-\beta$, and Cohen's $d$",
+                    "Multiple comparisons correction: Bonferroni and Benjamini-Hochberg procedures",
+                    "Non-parametric alternatives when normality assumptions fail: Mann-Whitney U test"
+                ]
+            }
+        },
+        "explanation": r"""### 1. Why Hypothesis Testing is Needed
+In business analytics, data science, and software engineering, we constantly encounter numerical differences. For example:
+- Did our checkout redesign increase conversion rate from 4.2% to 5.1%, or was it random daily fluctuation?
+- Does a database caching optimization speed up backend API responses by 45ms across all users, or was our test sample lucky?
+- Does customer retention differ significantly between enterprise accounts and retail users?
 
-#### Core Concepts:
-1. **Central Tendency & Skewness**:
-   * For symmetric normal distributions: Mean $\\approx$ Median.
-   * For right-skewed distributions (e.g., income, order value, SaaS LTV): Median is resistant to extreme outliers, while Mean is pulled to the right. Always report Median + IQR for skewed business data!
-2. **Hypothesis Testing Framework**:
-   * **Null Hypothesis ($H_0$)**: No real difference exists; observed difference is due to chance.
-   * **Alternative Hypothesis ($H_1$)**: A statistically significant difference exists.
-3. **The p-value**:
-   * The probability of observing results at least as extreme as the sample data, assuming $H_0$ is true.
-   * If $p < \\alpha$ (typically $0.05$): Reject $H_0$. The difference is statistically significant.
-   * If $p \\ge \\alpha$: Fail to reject $H_0$. Insufficient evidence of an effect.
-4. **Errors in Decision Making**:
-   * **Type I Error (False Positive)**: Claiming an effect exists when it doesn't (Rejecting true $H_0$). Probability = $\\alpha$.
-   * **Type II Error (False Negative)**: Failing to detect a real effect (Failing to reject false $H_0$). Probability = $\\beta$. Power = $1 - \\beta$.""",
-        "key_rules": "- In skewed distributions, report Median and IQR instead of Mean and Standard Deviation\n- p < 0.05 indicates statistical significance, not necessarily practical business significance\n- Always verify sample size and statistical power before declaring a feature launch failed",
-        "common_mistakes": "- Conflating correlation with causation\n- Interpreting p-value as the probability that the null hypothesis is true\n- Stopping A/B tests early as soon as p < 0.05 without reaching required sample size (p-hacking)",
+Because we cannot measure entire populations of past and future users simultaneously, we must draw conclusions from **samples**. Hypothesis testing provides the formal mathematical framework to quantify uncertainty and determine whether an observed effect is a genuine population signal or mere chance variation.
+
+### 2. Population vs. Sample Parameters
+- **Population**: The complete set of all individuals, events, or measurements of interest (e.g., all 500,000 monthly active users). Characteristics of a population are called **parameters** (Population Mean = $\mu$, Population Standard Deviation = $\sigma$).
+- **Sample**: A representative subset drawn from the population (e.g., 5,000 users in an A/B experiment). Characteristics of a sample are called **statistics** (Sample Mean = $\bar{x}$, Sample Standard Deviation = $s$).
+
+Because samples contain random sampling error, sample statistics fluctuate around true population parameters. Hypothesis testing bridges this gap.
+
+### 3. The Null Hypothesis ($H_0$)
+The **Null Hypothesis** ($H_0$) represents the skeptical baseline position: that there is **no true effect, no difference, and no relationship** in the underlying population. Any observed difference in our sample is assumed to be solely due to random sampling chance.
+
+Examples of $H_0$:
+- "The new checkout page has the exact same true conversion rate as the current page: $\mu_1 = \mu_2$."
+- "The average latency of API endpoint v2 is equal to endpoint v1: $\mu_{v2} = \mu_{v1}$."
+- "There is zero correlation between customer age and churn probability: $\rho = 0$."
+
+### 4. The Alternative Hypothesis ($H_1$ or $H_a$)
+The **Alternative Hypothesis** ($H_1$) represents the operational claim or research question: that a real, non-zero difference or effect exists in the population.
+
+Examples of $H_1$:
+- Two-tailed: "The conversion rate of the new page is different from the current page: $\mu_1 \neq \mu_2$."
+- One-tailed (directional): "The conversion rate of the new page is strictly greater than the current page: $\mu_1 > \mu_2$."
+
+### 5. Significance Level ($\alpha$)
+Before gathering or inspecting data, the researcher selects a **significance level** ($\alpha$). This represents the maximum acceptable risk of committing a **Type I error** (rejecting $H_0$ when it is actually true).
+- In business analytics and tech, $\alpha$ is conventionally set to **$0.05$** (5%).
+- In medical or mission-critical engineering applications, $\alpha$ is often set to $0.01$ (1%) or $0.001$ (0.1%).
+
+### 6. Test Statistic Calculation
+A test statistic measures how far our observed sample data diverges from the null hypothesis baseline, normalized by the expected standard error:
+
+$$
+\text{Test Statistic}
+=
+\frac{
+\text{Observed Difference} -
+\text{Hypothesized Difference}
+}{
+\text{Standard Error}
+}
+$$
+
+- **Z-Test**: Used when population variance $\sigma$ is known or sample size $n$ is very large ($n > 30$).
+- **T-Test**: Used when population variance is unknown and must be estimated from sample standard deviation $s$.
+- **Welch's T-Test**: Used when the two groups have unequal sample sizes or unequal variances:
+  
+$$
+t =
+\frac{
+\bar{x}_1-\bar{x}_2
+}{
+\sqrt{
+\frac{s_1^2}{n_1}
++
+\frac{s_2^2}{n_2}
+}
+}
+$$
+
+### 7. The P-Value & Decision Rules
+The **p-value** is the probability of obtaining test results at least as extreme as the results actually observed, assuming that the null hypothesis is completely true.
+
+**The Golden Decision Rules:**
+- **If $p < \alpha$ (typically $p < 0.05$)**: Reject $H_0$. The observed data is too improbable under random chance alone. We declare **statistical significance**.
+- **If $p \ge \alpha$**: Fail to reject $H_0$. There is insufficient evidence to conclude an effect exists. We do **not** say $H_0$ is proven; we simply do not have sufficient evidence to overturn it.
+
+### 8. Type I and Type II Errors
+Every statistical decision carries the risk of two fundamental errors:
+
+| Decision Made | H₀ is Actually True (No Effect) | H₀ is Actually False (Real Effect Exists) |
+| :--- | :--- | :--- |
+| **Reject H₀ (Claim Effect)** | **Type I Error ($\alpha$)** (False Positive) | **Correct Decision (Power $1 - \beta$)** |
+| **Fail to Reject H₀** | **Correct Decision ($1 - \alpha$)** | **Type II Error ($\beta$)** (False Negative) |
+
+- **Type I Error ($\alpha$)**: Declaring a winning marketing campaign when it actually had zero effect. Cost = Wasted rollout effort.
+- **Type II Error ($\beta$)**: Failing to detect a real, winning feature redesign because the sample size was too small. Cost = Missed business revenue.
+
+### 9. Statistical Power ($1 - \beta$)
+**Statistical Power** is the probability that our test will correctly detect a real effect when one exists ($1 - \beta$). Industry standard target power is **$80\%$** ($0.80$).
+
+Power depends on three critical levers:
+1. **Sample Size ($n$)**: Larger samples provide tighter distributions and higher power.
+2. **Effect Size (Cohen's $d$)**: Massive effects are easy to detect; subtle 0.2% lifts require huge samples.
+3. **Significance Level ($\alpha$)**: Lowering $\alpha$ to 0.01 reduces false positives but reduces power (increases Type II errors).
+
+### 10. Choosing the Appropriate Statistical Test
+Use this decision rubric:
+1. **Comparing 2 Independent Numerical Means**: Two-Sample Independent T-test (`scipy.stats.ttest_ind(..., equal_var=False)`).
+2. **Comparing Before/After on Same Subjects**: Paired T-test (`scipy.stats.ttest_rel`).
+3. **Comparing 2 Proportions / Conversion Rates**: Two-Proportion Z-test (`statsmodels.stats.proportion.proportions_ztest`).
+4. **Categorical Independence (e.g. Segment vs Device)**: Chi-Square Contingency Test (`scipy.stats.chi2_contingency`).
+5. **Non-Normal Skewed Numerical Data**: Mann-Whitney U Test (`scipy.stats.mannwhitneyu`).""",
+        "key_rules": "- In skewed business distributions, report Median and IQR instead of Mean and Standard Deviation\n- p < 0.05 indicates statistical significance, not necessarily practical business significance\n- Always verify sample size and statistical power (target 80%) before declaring an experiment inconclusive\n- Use Welch's t-test (equal_var=False) by default when comparing sample cohorts with unequal variances",
+        "common_mistakes": "- Conflating correlation with causation in non-randomized observational cohorts\n- Interpreting p-value as the probability that the null hypothesis is true (p-value assumes H₀ is true!)\n- Stopping A/B tests early as soon as p < 0.05 without reaching predefined sample size (p-hacking / peeking)\n- Declaring 'H₀ is proven true' instead of 'Failed to reject H₀ due to insufficient evidence'",
+        "code_examples": [
+            {
+                "title": "Two-Sample Independent T-Test (Welch's Test in Python)",
+                "language": "python",
+                "code": "import numpy as np\nfrom scipy import stats\n\n# Sample conversion order values from two user cohorts\ngroup_a = np.array([45.2, 52.0, 48.5, 55.1, 49.8, 51.2, 46.7, 53.4])\ngroup_b = np.array([54.3, 58.1, 56.4, 62.0, 59.2, 57.5, 60.1, 55.8])\n\n# Welch's t-test (robust against unequal sample sizes and variances)\nt_stat, p_val = stats.ttest_ind(group_a, group_b, equal_var=False)\n\nprint(f\"T-statistic: {t_stat:.4f}\")\nprint(f\"P-value:     {p_val:.4f}\")\n\nalpha = 0.05\nif p_val < alpha:\n    print(\"Decision: Reject H₀ -> Statistically significant difference detected!\")\nelse:\n    print(\"Decision: Fail to reject H₀ -> Insufficient evidence of difference.\")",
+                "explanation": "Executes Welch's t-test comparing group means. Since variances are often unequal in real business data, setting equal_var=False avoids inflated Type I error rates."
+            },
+            {
+                "title": "Two-Proportion Z-Test for A/B Testing Conversions",
+                "language": "python",
+                "code": "from statsmodels.stats.proportion import proportions_ztest\n\n# 10,000 visitors in each variant\n# Variant A (Control):   420 conversions (4.20%)\n# Variant B (Treatment): 510 conversions (5.10%)\nconversions = [420, 510]\nvisitors = [10000, 10000]\n\nz_stat, p_val = proportions_ztest(conversions, visitors, alternative='two-sided')\n\nprint(f\"Z-score: {z_stat:.4f}\")\nprint(f\"P-value: {p_val:.5f}\")\n\nif p_val < 0.05:\n    print(\"Result: Statistically significant uplift at alpha = 0.05!\")\nelse:\n    print(\"Result: Difference is within expected random variation.\")",
+                "explanation": "Evaluates proportion differences for discrete events (clicks, signups, purchases) across two independent web traffic streams."
+            }
+        ],
         "worked_example": {
-            "scenario": "An e-commerce firm tests a new checkout flow (Variant B) against the control (Variant A). Conversion rates are recorded across 10,000 visitors per variant.",
-            "code": "from scipy import stats\n\ndef evaluate_ab_test(conv_a: int, n_a: int, conv_b: int, n_b: int, alpha: float = 0.05):\n    # Two-proportion z-test\n    p_a = conv_a / n_a\n    p_b = conv_b / n_b\n    p_pool = (conv_a + conv_b) / (n_a + n_b)\n    se = (p_pool * (1 - p_pool) * (1/n_a + 1/n_b)) ** 0.5\n    z_stat = (p_b - p_a) / se\n    p_val = 2 * (1 - stats.norm.cdf(abs(z_stat)))\n    \n    is_significant = p_val < alpha\n    return {'rate_a': p_a, 'rate_b': p_b, 'p_value': p_val, 'significant': is_significant}",
-            "reasoning": "Computes pooled standard error, standard z-score, and two-tailed p-value to establish significance rigorously.",
-            "expected_output": "{'rate_a': 0.042, 'rate_b': 0.051, 'p_value': 0.0031, 'significant': True}"
+            "scenario": "An e-commerce firm tests a new checkout flow (Variant B) against the control (Variant A). Conversion rates are recorded across 10,000 visitors per variant. Management wants to know if the 0.9% conversion lift is statistically significant.",
+            "code": "from scipy import stats\n\ndef evaluate_ab_test(conv_a: int, n_a: int, conv_b: int, n_b: int, alpha: float = 0.05):\n    # Two-proportion z-test\n    p_a = conv_a / n_a\n    p_b = conv_b / n_b\n    p_pool = (conv_a + conv_b) / (n_a + n_b)\n    se = (p_pool * (1 - p_pool) * (1/n_a + 1/n_b)) ** 0.5\n    z_stat = (p_b - p_a) / se\n    p_val = 2 * (1 - stats.norm.cdf(abs(z_stat)))\n    \n    is_significant = p_val < alpha\n    return {'rate_a': p_a, 'rate_b': p_b, 'p_value': p_val, 'significant': is_significant}\n\nresult = evaluate_ab_test(420, 10000, 510, 10000)\nprint(result)",
+            "reasoning": "Step 1: Formulate hypotheses (H₀: p_b = p_a, H₁: p_b != p_a). Step 2: Compute pooled standard error across 20,000 visitors. Step 3: Calculate z-statistic (+2.96). Step 4: Determine two-tailed p-value (p = 0.0031). Since p < 0.05, we reject H₀ and confirm genuine uplift.",
+            "expected_output": "{'rate_a': 0.042, 'rate_b': 0.051, 'p_value': 0.00307, 'significant': True}"
+        },
+        "quick_reference": {
+            "key_terms": [
+                {"term": "Null Hypothesis (H₀)", "definition": "The default baseline assumption that no true effect, difference, or relationship exists in the population."},
+                {"term": "Alternative Hypothesis (H₁)", "definition": "The claim being tested that a true effect, difference, or relationship exists."},
+                {"term": "Significance Level (α)", "definition": "The maximum acceptable threshold of committing a Type I error, typically set to 0.05 (5%)."},
+                {"term": "P-Value", "definition": "The probability of observing sample data at least as extreme as observed, assuming H₀ is completely true."},
+                {"term": "Type I Error (α)", "definition": "False Positive: Rejecting H₀ when H₀ is actually true (declaring a win when none exists)."},
+                {"term": "Type II Error (β)", "definition": "False Negative: Failing to reject H₀ when a true effect exists (missing a real win)."},
+                {"term": "Statistical Power (1 - β)", "definition": "The probability of correctly rejecting a false null hypothesis (industry target is 80%)."}
+            ],
+            "formulas_rules": [
+                "Decision Rule: If p < α (0.05), Reject H₀. If p ≥ α, Fail to reject H₀.",
+                "Z-Score formula: z = (x̄ - μ) / (σ / √n)",
+                "Two-Sample Welch's T: t = (x̄₁ - x̄₂) / √(s₁²/n₁ + s₂²/n₂)",
+                "Always check sample size (power) before declaring an experiment 'no effect'."
+            ],
+            "takeaways": [
+                "Never say 'H₀ is proven true'; we only 'fail to reject H₀' due to insufficient sample evidence.",
+                "Statistical significance is NOT practical business significance: a tiny difference can be significant in a huge sample.",
+                "Avoid peeking at A/B test results daily and stopping early (p-hacking)."
+            ]
         },
         "guided_practice": {
             "prompt": "Write a Python function using `scipy.stats.ttest_ind` to compare customer spending between loyalty program members and non-members. Return whether the difference is significant at alpha = 0.05.",
@@ -372,6 +554,17 @@ Data analysts and scientists must distinguish real business signals from random 
                 "explanation": "Since p (0.02) < alpha (0.05), we reject the null hypothesis and declare statistical significance."
             },
             {
+                "question_text": "What is a Type I Error in experimentation?",
+                "options": [
+                    "Rejecting the null hypothesis when it is actually true (False Positive)",
+                    "Failing to reject the null hypothesis when a real effect exists (False Negative)",
+                    "Calculating standard deviation incorrectly",
+                    "Drawing a sample with zero variance"
+                ],
+                "correct": "Rejecting the null hypothesis when it is actually true (False Positive)",
+                "explanation": "A Type I Error (alpha) occurs when you conclude an effect exists (reject H₀) when in reality the null hypothesis is true."
+            },
+            {
                 "question_text": "What is a Type II Error in experimentation?",
                 "options": [
                     "Rejecting the null hypothesis when it is actually true (False Positive)",
@@ -381,6 +574,17 @@ Data analysts and scientists must distinguish real business signals from random 
                 ],
                 "correct": "Failing to reject the null hypothesis when a real effect exists (False Negative)",
                 "explanation": "Type II error (beta) occurs when a real effect exists in reality but the test lacks power to detect it."
+            },
+            {
+                "question_text": "What is Statistical Power in hypothesis testing?",
+                "options": [
+                    "The probability of correctly rejecting a false null hypothesis (1 - beta)",
+                    "The probability of committing a Type I error",
+                    "The value of the sample mean divided by the standard deviation",
+                    "The number of visitors in the A/B testing experiment"
+                ],
+                "correct": "The probability of correctly rejecting a false null hypothesis (1 - beta)",
+                "explanation": "Statistical Power (1 - beta) measures the sensitivity of the test to detect true differences when they exist, typically targeted at 80%."
             }
         ],
         "applied_task": {

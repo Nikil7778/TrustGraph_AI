@@ -848,16 +848,24 @@ export const api = {
     return handleResponse<ApiLearningModuleSummary[]>(res);
   },
 
-  async getLearningModule(slugOrId: string | number, userId: number): Promise<ApiLearningModuleDetail> {
-    const res = await fetch(`${API_BASE_URL}/learning/modules/${slugOrId}?user_id=${userId}`, { cache: 'no-store' });
+  async getLearningModule(slugOrId: string | number, userId: number, level?: string): Promise<ApiLearningModuleDetail> {
+    const url = level
+      ? `${API_BASE_URL}/learning/modules/${slugOrId}?user_id=${userId}&level=${encodeURIComponent(level)}`
+      : `${API_BASE_URL}/learning/modules/${slugOrId}?user_id=${userId}`;
+    const res = await fetch(url, { cache: 'no-store' });
     return handleResponse<ApiLearningModuleDetail>(res);
   },
 
   async submitPractice(
     slugOrId: string | number,
-    payload: ApiPracticeSubmissionPayload
+    payload: ApiPracticeSubmissionPayload,
+    userId?: number
   ): Promise<ApiPracticeSubmissionResponse> {
-    const res = await fetch(`${API_BASE_URL}/learning/modules/${slugOrId}/practice`, {
+    const effUser = userId ?? payload.user_id;
+    const url = effUser
+      ? `${API_BASE_URL}/learning/modules/${slugOrId}/practice?user_id=${effUser}`
+      : `${API_BASE_URL}/learning/modules/${slugOrId}/practice`;
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -867,9 +875,14 @@ export const api = {
 
   async submitConceptCheck(
     slugOrId: string | number,
-    payload: ApiConceptCheckSubmissionPayload
+    payload: ApiConceptCheckSubmissionPayload,
+    userId?: number
   ): Promise<ApiConceptCheckSubmissionResponse> {
-    const res = await fetch(`${API_BASE_URL}/learning/modules/${slugOrId}/concept-check`, {
+    const effUser = userId ?? payload.user_id;
+    const url = effUser
+      ? `${API_BASE_URL}/learning/modules/${slugOrId}/concept-check?user_id=${effUser}`
+      : `${API_BASE_URL}/learning/modules/${slugOrId}/concept-check`;
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -879,9 +892,14 @@ export const api = {
 
   async submitAppliedTask(
     slugOrId: string | number,
-    payload: ApiAppliedTaskSubmissionPayload
+    payload: ApiAppliedTaskSubmissionPayload,
+    userId?: number
   ): Promise<ApiAppliedTaskSubmissionResponse> {
-    const res = await fetch(`${API_BASE_URL}/learning/modules/${slugOrId}/applied-task`, {
+    const effUser = userId ?? payload.user_id;
+    const url = effUser
+      ? `${API_BASE_URL}/learning/modules/${slugOrId}/applied-task?user_id=${effUser}`
+      : `${API_BASE_URL}/learning/modules/${slugOrId}/applied-task`;
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -1695,6 +1713,11 @@ export interface ApiLearningModuleSummary {
   is_locked: boolean;
   lock_reason?: string;
   unlock_reason?: string;
+  level?: string;
+  is_rescue?: boolean;
+  is_targeted_refresher?: boolean;
+  rescue_reason?: string;
+  recommended_action_label?: string;
   practice_score?: number;
   concept_check_score?: number;
   concept_check_passed?: boolean;
@@ -1774,6 +1797,28 @@ export interface ApiLearningModuleDetail extends ApiLearningModuleSummary {
   explanation: string;
   key_rules?: string[] | string;
   common_mistakes?: string[] | string;
+  subtopics?: Array<{ id: string; title: string }>;
+  why_it_matters_by_role?: Record<string, string>;
+  code_examples?: Array<{ title: string; language: string; code: string; explanation: string }>;
+  quick_reference?: {
+    key_terms?: Array<{ term: string; definition: string }>;
+    formulas_rules?: string[];
+    takeaways?: string[];
+  };
+  level_variations?: Record<string, {
+    level: string;
+    focus: string;
+    prerequisite_recap?: string;
+    explanation_supplement?: string;
+    key_additions?: string[];
+  }>;
+  adaptive_next_action?: {
+    label: string;
+    action_type: string;
+    description: string;
+    target_tab?: string;
+  };
+  effective_level?: string;
   worked_example: ApiWorkedExample;
   guided_practice: ApiGuidedExercise;
   independent_practice: ApiIndependentExercise;
@@ -1828,16 +1873,22 @@ export interface ApiConceptCheckSubmissionResponse {
 }
 
 export interface ApiAppliedTaskSubmissionPayload {
-  user_id: number;
-  submission_text: string;
+  user_id?: number;
+  code_or_query: string;
+  business_rationale?: string;
+  submission_text?: string;
 }
 
 export interface ApiAppliedTaskSubmissionResponse {
   module_slug: string;
   score: number;
-  passed: boolean;
+  passed?: boolean;
+  success?: boolean;
   feedback: string;
-  status: string;
-  evidence_score: number;
+  status?: string;
+  new_status?: string;
+  evidence_score?: number;
+  evidence_created?: boolean;
+  rubric_scores?: Record<string, number>;
 }
 

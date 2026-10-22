@@ -3,6 +3,8 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useLearner } from '../context/LearnerContext';
+import { getInitials } from '../lib/utils';
 import {
   LayoutDashboard,
   Dna,
@@ -31,6 +33,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCloseMobile,
 }) => {
   const pathname = usePathname();
+  const { activeUser } = useLearner();
+
+  const displayName = activeUser?.name || 'Learner';
+  const targetRoleName = activeUser?.target_role?.name || 'No target role set';
+  const initials = getInitials(activeUser?.name);
 
   const navSections = [
     {
@@ -143,12 +150,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="p-3 border-t border-slate-200 shrink-0 bg-slate-50/50">
         <div className="px-2 py-1.5 flex items-center justify-between text-xs text-slate-600">
           <div className="flex items-center gap-2.5 overflow-hidden">
-            <div className="w-7 h-7 rounded-full bg-slate-800 text-white font-bold text-[11px] flex items-center justify-center shrink-0">
-              AM
-            </div>
+            {activeUser?.avatar_url ? (
+              <img
+                src={activeUser.avatar_url}
+                alt={displayName}
+                className="w-7 h-7 rounded-full border border-slate-200 object-cover shrink-0"
+              />
+            ) : (
+              <div className="w-7 h-7 rounded-full bg-slate-800 text-white font-bold text-[11px] flex items-center justify-center shrink-0">
+                {initials}
+              </div>
+            )}
             <div className="overflow-hidden">
-              <span className="font-semibold text-slate-900 block truncate text-xs">Alex Mercer</span>
-              <span className="text-[10px] text-slate-500 block truncate">Target: Data Analyst</span>
+              <span className="font-semibold text-slate-900 block truncate text-xs">{displayName}</span>
+              <span className="text-[10px] text-slate-500 block truncate">Target: {targetRoleName}</span>
             </div>
           </div>
         </div>

@@ -211,7 +211,7 @@ Predictive model performance is fundamentally bounded by the quality and represe
         "skill_name": "Machine Learning",
         "title": "Model Evaluation, Cross-Validation & Metric Optimization",
         "concept_name": "Metric Tradeoffs, Stratified Cross-Validation & Threshold Tuning",
-        "difficulty": "Intermediate",
+        "difficulty": "Advanced",
         "estimated_minutes": 25,
         "order_index": 9,
         "prerequisite_concept_slugs": "machine-learning-foundations",
@@ -299,109 +299,226 @@ Always use `StratifiedKFold` for classification to guarantee that every validati
     },
 
     # -------------------------------------------------------------------------
-    # 10. Python Developer — Python Advanced Fundamentals
+    # 10. Python Developer — Python Foundations: Syntax, Variables & Control Flow
     # -------------------------------------------------------------------------
     {
         "slug": "python-core-fundamentals",
         "skill_name": "Python Basics",
-        "title": "Python Advanced Fundamentals & Idiomatic Code",
-        "concept_name": "Memory Model, Generators, Comprehensions & Type Hints",
+        "title": "Python Foundations: Syntax, Variables & Control Flow",
+        "concept_name": "Variables, Primitive Types, Conditionals & Loops",
         "difficulty": "Beginner",
         "estimated_minutes": 25,
         "order_index": 10,
         "prerequisite_concept_slugs": "",
         "target_role_name": "Python Developer",
         "learning_objectives": [
-            "Master Python object references, mutable vs immutable memory models, and identity (`is`) vs equality (`==`)",
-            "Construct memory-efficient streaming data pipelines using generator functions and expressions",
-            "Apply comprehensive type hints (`typing` module) and write clean, idiomatic PEP 8 code",
+            "Master Python variable assignment, dynamic typing, and primitive data types (int, float, str, bool)",
+            "Implement conditional branching logic using if, elif, else, and boolean logical operators",
+            "Construct deterministic loops using for with range(), while loops, and loop control statements (break, continue)",
         ],
-        "explanation": """### The Python Object Model & Memory Lifecycle
-In Python, **everything is an object**. Variables are not memory boxes that hold values; variables are **names that reference objects in memory**.
+        "explanation": """### Python Foundations: Core Syntax & Flow Control
+Python is an expressive, dynamically typed programming language designed for readability and developer efficiency. Before tackling object-oriented patterns or asynchronous APIs, you must master the core primitives and deterministic control flow.
 
-#### Mutability & Identity:
-* **Immutable Types**: `int`, `float`, `str`, `tuple`, `frozenset`. Reassigning creates a new object in memory.
-* **Mutable Types**: `list`, `dict`, `set`. Modifying updates the existing memory reference in place.
-* `==` tests **value equality** (do they hold the same contents?).
-* `is` tests **identity** (do both names point to the exact same memory address `id(a) == id(b)`?).
+#### Dynamic Typing & Primitive Types:
+Python variables are dynamically typed references to objects. You do not declare variable types explicitly:
+* **Integers & Floats**: `count = 42`, `rate = 0.05`
+* **Strings**: `'single quotes'` or `"double quotes"`, supporting formatted f-strings: `f"Count: {count}"`
+* **Booleans**: `True` and `False` (capitalized)
+* **Type Conversion**: `int("123")`, `str(456)`, `float("3.14")`, `bool(1)`
 
-#### The Cardinal Sin: Mutable Default Arguments
-Never write `def append_item(item, items=[]):`. Default argument expressions are evaluated **once when the function definition is executed**, not at each call. Every call shares the exact same list instance!
-Always write:
+#### Control Flow: Conditionals
+Python uses strict 4-space indentation to define code blocks (no curly braces `{}`).
 ```python
-def append_item(item, items=None):
-    if items is None:
-        items = []
-    items.append(item)
-    return items
+if score >= 90:
+    grade = "A"
+elif score >= 80:
+    grade = "B"
+else:
+    grade = "C"
 ```
+Boolean operators include `and`, `or`, and `not`. Comparison operators include `==` (equality), `!=` (inequality), `<`, `<=`, `>`, `>=`.
 
-#### Generators for Memory Efficiency:
-When processing 10,000,000 records, a list comprehension stores all 10M records in RAM simultaneously (potentially gigabytes). A generator expression `(process(x) for x in records)` calculates values on demand using `yield`, maintaining $O(1)$ constant memory overhead.""",
-        "key_rules": "- Never use mutable objects ([], {}) as default arguments in functions\n- Use generators (yield) when processing large or streaming data sequences\n- Use 'is' strictly for singleton comparisons (e.g. 'val is None')",
-        "common_mistakes": "- Modifying a list while iterating over it in a for loop\n- Confusing 'is' (identity) with '==' (equality)\n- Creating huge in-memory lists when a generator pipeline would consume constant memory",
+#### Iteration: For Loops & While Loops
+The `for` loop iterates over sequences or ranges:
+```python
+# Iterates 0, 1, 2, 3, 4
+for i in range(5):
+    if i == 2:
+        continue  # skip to next iteration
+    if i == 4:
+        break     # exit loop immediately
+```
+The `while` loop executes as long as a condition evaluates to `True`.""",
+        "key_rules": "- Indentation matters: Python uses exactly 4 spaces per block, never mix tabs and spaces\n- Use '==' for value equality comparison, '=' for variable assignment\n- Statements like if, elif, else, for, and while must end with a colon (:)",
+        "common_mistakes": "- Forgetting the trailing colon on compound statements\n- Off-by-one errors with range(start, stop): range(1, 5) stops at 4, not 5\n- Using assignment operator '=' inside an if condition instead of '=='",
         "worked_example": {
-            "scenario": "A backend Python engineer writes a memory-efficient log streaming pipeline that filters error records without loading entire gigabyte log files into memory.",
-            "code": "from typing import Iterator, Dict\n\ndef stream_error_logs(log_filepath: str) -> Iterator[Dict[str, str]]:\n    with open(log_filepath, 'r', encoding='utf-8') as f:\n        for line in f:\n            line = line.strip()\n            if 'ERROR' in line or 'CRITICAL' in line:\n                parts = line.split(' - ')\n                if len(parts) >= 3:\n                    yield {\n                        'timestamp': parts[0],\n                        'level': parts[1],\n                        'message': parts[2]\n                    }\n\n# Usage: Memory consumption remains constant regardless of file size\n# for error in stream_error_logs('production.log'):\n#     send_alert(error)",
-            "reasoning": "1. Uses with open context manager for guaranteed resource cleanup. 2. Iterates line-by-line streaming from disk. 3. yield keyword turns function into generator yielding dictionaries.",
-            "expected_output": "{'timestamp': '2025-05-10 14:22:01', 'level': 'ERROR', 'message': 'Database connection timeout'}"
+            "scenario": "A backend service needs to validate incoming user registration data, verifying age thresholds and categorizing the user account tier.",
+            "code": "def evaluate_registration(age: int, has_verified_email: bool) -> str:\n    if age < 18:\n        return 'REJECTED: Minimum age requirement is 18'\n    elif not has_verified_email:\n        return 'PENDING: Email verification required'\n    elif age >= 65:\n        return 'APPROVED: Senior Account Tier'\n    else:\n        return 'APPROVED: Standard Account Tier'\n\n# Test verification\nprint(evaluate_registration(25, True))  # APPROVED: Standard Account Tier",
+            "reasoning": "1. Checks boundary condition age < 18 first. 2. Checks boolean condition for email verification. 3. Categorizes tier based on age threshold.",
+            "expected_output": "APPROVED: Standard Account Tier"
         },
         "guided_practice": {
-            "prompt": "Write a generator function `filter_active_users(users: list) -> Iterator[dict]` that yields only user dictionaries where `is_active` is True and `email` is not empty.",
-            "starter_code": "from typing import Iterator, List, Dict\n\ndef filter_active_users(users: List[Dict]) -> Iterator[Dict]:\n    # Your generator code using yield\n    pass",
-            "solution": "from typing import Iterator, List, Dict\n\ndef filter_active_users(users: List[Dict]) -> Iterator[Dict]:\n    for u in users:\n        if u.get('is_active') is True and bool(u.get('email')):\n            yield u",
+            "prompt": "Write a function `categorize_transaction(amount: float) -> str` that returns 'SMALL' for amounts <= 50, 'MEDIUM' for amounts <= 500, and 'LARGE' for amounts > 500.",
+            "starter_code": "def categorize_transaction(amount: float) -> str:\n    # Implement conditional tier classification\n    pass",
+            "solution": "def categorize_transaction(amount: float) -> str:\n    if amount <= 50:\n        return 'SMALL'\n    elif amount <= 500:\n        return 'MEDIUM'\n    else:\n        return 'LARGE'",
             "hints": [
-                "Step 1: Iterate over users using a for loop.",
-                "Step 2: Check u.get('is_active') is True and u.get('email').",
-                "Step 3: yield u when conditions are satisfied."
+                "Step 1: Check if amount <= 50 first.",
+                "Step 2: Use elif amount <= 500 for the middle tier.",
+                "Step 3: Use else to return 'LARGE'."
             ]
         },
         "independent_practice": {
-            "prompt": "Write a function `safe_append(val: int, container: list = None) -> list` that appends val to container without the mutable default argument bug.",
-            "starter_code": "def safe_append(val: int, container: list = None) -> list:\n    # Implement safe default argument pattern\n    pass",
-            "solution": "def safe_append(val: int, container: list = None) -> list:\n    if container is None:\n        container = []\n    container.append(val)\n    return container",
-            "test_criteria": "Uses None default argument, initializes new list if None, appends val and returns list."
+            "prompt": "Write a function `sum_even_numbers(n: int) -> int` that uses a for loop with range() to calculate the sum of all even integers from 2 up to n inclusive.",
+            "starter_code": "def sum_even_numbers(n: int) -> int:\n    # Sum even numbers up to n\n    pass",
+            "solution": "def sum_even_numbers(n: int) -> int:\n    total = 0\n    for num in range(2, n + 1, 2):\n        total += num\n    return total",
+            "test_criteria": "Uses range with step 2 (or modulo % 2 check), sums even integers up to n inclusive, and returns integer total."
         },
         "concept_check": [
             {
-                "question_text": "What occurs when a function is declared with `def register(user, tags=[])` and called multiple times without passing `tags`?",
+                "question_text": "What is the output of `list(range(1, 5))` in Python?",
                 "options": [
-                    "A new empty list is created on every call",
-                    "All calls without a tags parameter share and mutate the exact same list instance in memory",
-                    "Python raises a TypeError at runtime",
-                    "The function becomes asynchronous"
+                    "[1, 2, 3, 4, 5]",
+                    "[1, 2, 3, 4]",
+                    "[0, 1, 2, 3, 4]",
+                    "[2, 3, 4, 5]"
                 ],
-                "correct": "All calls without a tags parameter share and mutate the exact same list instance in memory",
-                "explanation": "Default argument expressions are evaluated once at module import time, not at function invocation time. The single list object is shared across all calls."
+                "correct": "[1, 2, 3, 4]",
+                "explanation": "In Python, range(start, stop) generates numbers up to but excluding the stop boundary. Therefore range(1, 5) yields 1, 2, 3, and 4."
             },
             {
-                "question_text": "What is the difference between `a == b` and `a is b` in Python?",
+                "question_text": "Which statement correctly checks if a variable `count` is between 10 and 20 inclusive?",
                 "options": [
-                    "`==` compares values; `is` checks whether both variables reference the exact same memory address",
-                    "`==` is for numbers; `is` is for strings",
-                    "`is` converts both variables to boolean before comparison",
-                    "There is no difference in Python 3"
+                    "if 10 <= count <= 20:",
+                    "if count >= 10 && count <= 20:",
+                    "if count between 10 and 20:",
+                    "if 10 < count < 20:"
                 ],
-                "correct": "`==` compares values; `is` checks whether both variables reference the exact same memory address",
-                "explanation": "Equality (==) checks content equivalence via __eq__. Identity (is) checks whether id(a) == id(b)."
+                "correct": "if 10 <= count <= 20:",
+                "explanation": "Python supports chained comparison operators: `10 <= count <= 20` is valid and idiomatic (equivalent to `count >= 10 and count <= 20`). Python uses `and`, not `&&`."
             },
             {
-                "question_text": "Why are generator functions preferred over list comprehensions when processing millions of records?",
+                "question_text": "What happens if you use a single '=' instead of '==' in a Python conditional like `if x = 5:`?",
                 "options": [
-                    "Generators run on multi-threaded CPU cores automatically",
-                    "Generators produce values lazily on demand, maintaining $O(1)$ constant memory overhead rather than storing all records in RAM",
-                    "Generators can only be used with dictionaries",
-                    "Generators compile directly to C extensions"
+                    "x is assigned 5 and the condition evaluates to True",
+                    "Python raises a SyntaxError at compile time",
+                    "Python casts x to a boolean",
+                    "x is compared to 5 with type coercion"
                 ],
-                "correct": "Generators produce values lazily on demand, maintaining $O(1)$ constant memory overhead rather than storing all records in RAM",
-                "explanation": "Generators use lazy evaluation, computing the next element only when requested, which prevents memory exhaustion on massive datasets."
+                "correct": "Python raises a SyntaxError at compile time",
+                "explanation": "In Python, assignment (=) is a statement, not an expression, and causes a SyntaxError inside if conditions."
             }
         ],
         "applied_task": {
-            "role_scenario": "Python Backend Ingestion Engine",
-            "task_description": "Implement a production-grade data streaming utility with type annotations, generator pipelines, and safe default argument handling for batch ingestion.",
-            "starter_code": "def create_batch_streamer(source_records, batch_size=100):\n    # Yield batches of records lazily\n    pass",
-            "rubrics": "Uses generator yield, applies type hints, handles variable chunk sizes, maintains constant memory consumption."
+            "role_scenario": "Python Backend Ingestion Validator",
+            "task_description": "Implement a transaction processor function `audit_transactions(transactions: list) -> dict` that loops through numeric amounts, sums total valid transactions (amounts > 0), and counts flagged negative values.",
+            "starter_code": "def audit_transactions(transactions: list) -> dict:\n    # Process transactions with loops and conditionals\n    pass",
+            "rubrics": "Uses for loop, correctly checks amount > 0, tracks total_amount and flagged_count, returns dictionary with summary."
+        }
+    },
+
+    # -------------------------------------------------------------------------
+    # 11. Python Developer — Collections, Functions & Modular Code
+    # -------------------------------------------------------------------------
+    {
+        "slug": "python-collections-functions",
+        "skill_name": "Data Structures",
+        "title": "Python Collections, Functions & Modular Code",
+        "concept_name": "Lists, Dictionaries, Tuples, Sets & Functions",
+        "difficulty": "Beginner",
+        "estimated_minutes": 30,
+        "order_index": 11,
+        "prerequisite_concept_slugs": "python-core-fundamentals",
+        "target_role_name": "Python Developer",
+        "learning_objectives": [
+            "Manipulate core collections: lists (ordered, mutable), dictionaries (key-value, mutable), tuples (immutable), and sets (unique)",
+            "Define modular functions with positional arguments, keyword arguments, default values, and explicit return statements",
+            "Understand Python variable scope (LEGB rule) and structure reusable, testable code modules",
+        ],
+        "explanation": """### Python Collections & Reusable Functions
+In backend development, data rarely arrives as isolated primitives. You process sequences of items, key-value configurations, and structured payloads using Python's built-in collections.
+
+#### Core Python Collections:
+1. **Lists (`[]`)**: Ordered, mutable sequences. Support indexing, slicing (`items[1:3]`), `.append()`, `.pop()`.
+2. **Dictionaries (`{}`)**: Key-value hash tables. Fast $O(1)$ lookups by key. Use `.get(key, default)` to avoid `KeyError`.
+3. **Tuples (`()`)**: Ordered, immutable sequences. Used for fixed records, multi-value returns, and dictionary keys.
+4. **Sets (`set()`)**: Unordered collections of unique elements. Fast membership testing (`item in my_set`) and set operations (union, intersection).
+
+#### Modular Functions:
+Functions encapsulate reusable logic:
+```python
+def calculate_tax(subtotal: float, tax_rate: float = 0.08) -> float:
+    \"\"\"Calculate total tax for a given subtotal.\"\"\"
+    if subtotal < 0:
+        raise ValueError("Subtotal cannot be negative")
+    return round(subtotal * tax_rate, 2)
+```
+
+#### The Cardinal Rule of Default Arguments:
+Never use a mutable object (`[]` or `{}`) as a default argument. Default arguments are evaluated once at function definition time. Always use `None` as the default and initialize the collection inside the function body.""",
+        "key_rules": "- Use .get() when accessing dictionary keys that might not exist to prevent KeyErrors\n- Never use mutable defaults (def fn(items=[])): use def fn(items=None) instead\n- Tuples and strings are immutable; lists and dictionaries are mutable",
+        "common_mistakes": "- Modifying a list while iterating over it in a for loop\n- Forgetting that sets are unordered and do not support positional indexing like s[0]\n- Assuming function parameters are pass-by-value; Python passes object references",
+        "worked_example": {
+            "scenario": "A backend service aggregates user metrics from a list of user profile dictionaries, calculating active user count and average age.",
+            "code": "from typing import List, Dict, Any\n\ndef aggregate_user_metrics(users: List[Dict[str, Any]]) -> Dict[str, Any]:\n    active_count = 0\n    total_age = 0\n    \n    for user in users:\n        if user.get('is_active', False):\n            active_count += 1\n            total_age += user.get('age', 0)\n            \n    avg_age = round(total_age / active_count, 1) if active_count > 0 else 0.0\n    return {'active_users': active_count, 'average_age': avg_age}\n\n# Verification\nsample_users = [\n    {'name': 'Alice', 'age': 30, 'is_active': True},\n    {'name': 'Bob', 'age': 40, 'is_active': False},\n    {'name': 'Charlie', 'age': 20, 'is_active': True},\n]\nprint(aggregate_user_metrics(sample_users))",
+            "reasoning": "1. Uses .get() for defensive dictionary access. 2. Iterates list of dicts. 3. Handles division by zero safely.",
+            "expected_output": "{'active_users': 2, 'average_age': 25.0}"
+        },
+        "guided_practice": {
+            "prompt": "Write a function `count_word_frequencies(words: list) -> dict` that counts how many times each word appears in the list and returns a dictionary mapping word to frequency count.",
+            "starter_code": "def count_word_frequencies(words: list) -> dict:\n    # Implement frequency counter\n    pass",
+            "solution": "def count_word_frequencies(words: list) -> dict:\n    counts = {}\n    for word in words:\n        counts[word] = counts.get(word, 0) + 1\n    return counts",
+            "hints": [
+                "Step 1: Initialize an empty dictionary `counts = {}`.",
+                "Step 2: Iterate through each word in words.",
+                "Step 3: Use `counts.get(word, 0) + 1` to increment the tally."
+            ]
+        },
+        "independent_practice": {
+            "prompt": "Write a function `filter_unique_tags(tags_list: list) -> list` that accepts a list of string tags with duplicates, removes duplicates, and returns a sorted list of unique tags.",
+            "starter_code": "def filter_unique_tags(tags_list: list) -> list:\n    # Deduplicate and sort tags\n    pass",
+            "solution": "def filter_unique_tags(tags_list: list) -> list:\n    return sorted(list(set(tags_list)))",
+            "test_criteria": "Uses set() to deduplicate tags, converts back to list, and returns sorted ascending order."
+        },
+        "concept_check": [
+            {
+                "question_text": "What is the safest way to retrieve the value for key 'email' from dictionary `user_data` when the key may not exist?",
+                "options": [
+                    "user_data['email']",
+                    "user_data.get('email', None)",
+                    "user_data.find('email')",
+                    "user_data.index('email')"
+                ],
+                "correct": "user_data.get('email', None)",
+                "explanation": "Calling `dict.get(key, default)` returns the default value (or None) if the key is missing, whereas `user_data['email']` raises a KeyError."
+            },
+            {
+                "question_text": "Which collection type in Python enforces unique elements with fast $O(1)$ membership checking?",
+                "options": [
+                    "List",
+                    "Tuple",
+                    "Set",
+                    "OrderedDict"
+                ],
+                "correct": "Set",
+                "explanation": "A Set in Python is backed by a hash table, ensuring all elements are unique and providing average $O(1)$ lookup time for the `in` operator."
+            },
+            {
+                "question_text": "Why should you avoid using `def append_item(item, container=[])` with a mutable list default?",
+                "options": [
+                    "Python will throw a SyntaxError",
+                    "The single list instance is created once at function definition time and mutated across all subsequent calls",
+                    "Lists cannot be used as function arguments in Python 3",
+                    "The function becomes asynchronous"
+                ],
+                "correct": "The single list instance is created once at function definition time and mutated across all subsequent calls",
+                "explanation": "Default parameter values are evaluated once when the function is defined. A mutable default like `[]` is shared across every call that does not provide a container."
+            }
+        ],
+        "applied_task": {
+            "role_scenario": "Python Backend Product Catalog",
+            "task_description": "Implement a catalog grouping function `group_products_by_category(products: list) -> dict` that takes product dictionaries with 'name', 'price', and 'category', and groups product names into lists indexed by category.",
+            "starter_code": "def group_products_by_category(products: list) -> dict:\n    # Group products by category\n    pass",
+            "rubrics": "Uses dictionaries and lists, groups product names under category keys, handles empty inputs gracefully."
         }
     },
 
@@ -415,8 +532,8 @@ When processing 10,000,000 records, a list comprehension stores all 10M records 
         "concept_name": "Encapsulation, Polymorphism, Composition & Abstract Base Classes",
         "difficulty": "Intermediate",
         "estimated_minutes": 30,
-        "order_index": 11,
-        "prerequisite_concept_slugs": "python-core-fundamentals",
+        "order_index": 12,
+        "prerequisite_concept_slugs": "python-collections-functions",
         "target_role_name": "Python Developer",
         "learning_objectives": [
             "Enforce interface contracts using Python's `abc.ABC` and `@abstractmethod` decorators",
@@ -520,8 +637,8 @@ Use `@dataclass(frozen=True)` for immutable domain transfer objects (DTOs), redu
         "concept_name": "Exception Hierarchies, Context Managers & Safe Failures",
         "difficulty": "Intermediate",
         "estimated_minutes": 25,
-        "order_index": 12,
-        "prerequisite_concept_slugs": "python-core-fundamentals",
+        "order_index": 13,
+        "prerequisite_concept_slugs": "python-collections-functions",
         "target_role_name": "Python Developer",
         "learning_objectives": [
             "Construct clear domain-specific custom exception hierarchies inheriting from `Exception`",
@@ -638,7 +755,7 @@ except sqlite3.OperationalError as err:
         "concept_name": "HTTP Verbs, Status Codes, Idempotency & Resource Design",
         "difficulty": "Intermediate",
         "estimated_minutes": 25,
-        "order_index": 13,
+        "order_index": 14,
         "prerequisite_concept_slugs": "python-oop-architecture",
         "target_role_name": "Python Developer",
         "learning_objectives": [
@@ -742,9 +859,9 @@ Representational State Transfer (REST) is an architectural style centered on **r
         "skill_name": "FastAPI",
         "title": "FastAPI Production API Development, Pydantic & Async",
         "concept_name": "APIRouter, Pydantic Models, Dependency Injection & Async Endpoints",
-        "difficulty": "Intermediate",
+        "difficulty": "Advanced",
         "estimated_minutes": 30,
-        "order_index": 14,
+        "order_index": 16,
         "prerequisite_concept_slugs": "rest-api-design-architecture,python-error-handling-robustness",
         "target_role_name": "Python Developer",
         "learning_objectives": [
@@ -859,7 +976,7 @@ def get_user(user_id: int, db: Session = Depends(get_db)):
         "difficulty": "Intermediate",
         "estimated_minutes": 25,
         "order_index": 15,
-        "prerequisite_concept_slugs": "fastapi-rest-endpoints",
+        "prerequisite_concept_slugs": "python-error-handling-robustness",
         "target_role_name": "Python Developer",
         "learning_objectives": [
             "Construct isolated, repeatable test fixtures with setup and teardown using `@pytest.fixture`",
@@ -979,9 +1096,9 @@ def test_checkout(mock_stripe):
         "skill_name": "Deployment & Docker",
         "title": "Containerization & Dockerfile Deployment Pipelines",
         "concept_name": "Multi-Stage Dockerfiles, Layer Caching & Container Security",
-        "difficulty": "Intermediate",
+        "difficulty": "Advanced",
         "estimated_minutes": 25,
-        "order_index": 16,
+        "order_index": 17,
         "prerequisite_concept_slugs": "fastapi-rest-endpoints,pytest-automated-testing",
         "target_role_name": "Python Developer",
         "learning_objectives": [
@@ -1080,6 +1197,204 @@ Build tools (gcc, git, build-essential) are needed to compile C-extensions (like
             "task_description": "Write a complete production Dockerfile and docker-compose.yml configuration for a FastAPI application with PostgreSQL database and health checks.",
             "starter_code": "# Write Dockerfile specification\nFROM python:3.11-slim\n# Complete configuration",
             "rubrics": "Uses non-root user, multi-stage or cached layer structure, configures entrypoint uvicorn and health check."
+        }
+    },
+
+    # -------------------------------------------------------------------------
+    # 17. Data Analyst — Advanced SQL Window Functions & Analytics
+    # -------------------------------------------------------------------------
+    {
+        "slug": "sql-window-functions-analytics",
+        "skill_name": "SQL",
+        "title": "Advanced SQL Window Functions, Ranking & Cohort Analysis",
+        "concept_name": "Window Functions, Partitioning, Running Totals & Cohorts",
+        "difficulty": "Advanced",
+        "estimated_minutes": 35,
+        "order_index": 18,
+        "prerequisite_concept_slugs": "sql-fundamentals,sql-joins-mastery",
+        "target_role_name": "Data Analyst",
+        "learning_objectives": [
+            "Construct non-collapsing analytical aggregates using the OVER (PARTITION BY ... ORDER BY ...) clause",
+            "Distinguish ranking semantics: ROW_NUMBER() vs RANK() vs DENSE_RANK()",
+            "Calculate inter-row temporal metrics using LAG() and LEAD() offsets for user retention analysis",
+            "Build running totals and moving averages with sliding frame specifications (ROWS BETWEEN)",
+        ],
+        "subtopics": [
+            {"id": "anatomy", "title": "1. Anatomy of the OVER Clause"},
+            {"id": "partitioning", "title": "2. PARTITION BY vs. GROUP BY"},
+            {"id": "ranking", "title": "3. ROW_NUMBER, RANK, and DENSE_RANK"},
+            {"id": "navigation", "title": "4. LAG and LEAD Inter-Row Calculations"},
+            {"id": "sliding-frames", "title": "5. Sliding Window Frames (ROWS BETWEEN)"},
+            {"id": "worked-example", "title": "6. Real-World Retention Analysis Problem"},
+            {"id": "common-mistakes", "title": "7. Common Window Function Pitfalls"},
+            {"id": "quick-reference", "title": "8. Window Function Cheat Sheet"},
+            {"id": "practice", "title": "9. Guided & Independent Practice Lab"},
+            {"id": "concept-check", "title": "10. Formative Concept Check (4 Questions)"},
+            {"id": "applied-task", "title": "11. Production Cohort Analysis Task"},
+            {"id": "resources", "title": "12. Verified External SQL Documentation"},
+        ],
+        "why_it_matters_by_role": {
+            "Data Analyst": "Window functions are the ultimate divider between junior data clerks and senior analytical powerhouses. Without window functions, computing month-over-month growth, rolling 7-day revenue, or identifying the top 3 purchases per customer requires complex, slow self-joins. Window functions calculate values across rows while preserving individual transactional records.",
+            "Data Scientist": "In feature engineering for time-series and user behavior models, window functions create cumulative user aggregates, temporal lags, and recency features directly inside the database before feeding tabular models.",
+            "Python Developer": "Understanding window functions allows backend developers to push heavy aggregation logic into relational engines, dramatically cutting network bandwidth and application memory overhead compared to in-memory Python loops."
+        },
+        "level_variations": {
+            "Beginner": {
+                "level": "Beginner",
+                "focus": "Basic OVER () Syntax & ROW_NUMBER",
+                "prerequisite_recap": "Assumes standard SELECT, WHERE, and JOIN knowledge.",
+                "explanation_supplement": "Standard GROUP BY collapses multiple rows into a single summary row. Window functions, on the other hand, compute a running aggregate or rank while keeping every single original row in your result table.",
+                "key_additions": ["Mental model: transparent sliding glass pane over rows", "OVER () empty window", "ROW_NUMBER() for pagination"]
+            },
+            "Intermediate": {
+                "level": "Intermediate",
+                "focus": "PARTITION BY, LAG/LEAD & Cumulative Totals",
+                "prerequisite_recap": "Focuses on partitioning sub-cohorts and comparing current row against preceding rows.",
+                "explanation_supplement": "Combining PARTITION BY with ORDER BY establishes a separate partition per group (e.g., per customer_id) and applies a running cumulative calculation down the ordered rows.",
+                "key_additions": ["LAG() for period-over-period differences", "DENSE_RANK() without gaps", "PARTITION BY multiple columns"]
+            },
+            "Advanced": {
+                "level": "Advanced",
+                "focus": "Frame Specifications: ROWS vs RANGE & Performance",
+                "prerequisite_recap": "Focuses on deep engine execution and memory optimization for big data warehouses.",
+                "explanation_supplement": "Omitting frame specifications defaults to RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW, which can cause subtle duplicate-sorting bugs and quadratic memory usage. Explicitly declare ROWS BETWEEN for linear performance.",
+                "key_additions": ["ROWS BETWEEN 6 PRECEDING AND CURRENT ROW for moving averages", "Spill-to-disk mitigation", "Qualify clauses in modern warehouses"]
+            }
+        },
+        "explanation": """### The Power of SQL Window Functions
+In traditional SQL aggregations with `GROUP BY`, rows are collapsed into summary groups. While useful for total sums, it eliminates individual row-level detail.
+
+**Window functions** solve this by calculating aggregate or ranking values across a defined set of rows—termed a *window*—while **preserving every original row** in the final output.
+
+#### 1. Core Syntax Anatomy
+```sql
+FUNCTION() OVER (
+    [PARTITION BY partition_column]
+    [ORDER BY sort_column ASC|DESC]
+    [ROWS BETWEEN frame_start AND frame_end]
+)
+```
+
+- **`PARTITION BY`**: Divides the dataset into independent logical groups (similar to GROUP BY, but rows are not collapsed).
+- **`ORDER BY`**: Dictates the sequence in which the calculation progresses within each partition.
+- **`Frame Specification`**: Declares exactly which surrounding rows are included (e.g., `ROWS BETWEEN 2 PRECEDING AND CURRENT ROW`).
+
+#### 2. Ranking Functions Comparison
+| Function | Duplicate Handling | Example Sequence (values: 100, 100, 80) |
+| :--- | :--- | :--- |
+| `ROW_NUMBER()` | Assigns arbitrary sequential integer | 1, 2, 3 |
+| `RANK()` | Ties get same rank; skips next numbers | 1, 1, 3 |
+| `DENSE_RANK()` | Ties get same rank; does NOT skip numbers | 1, 1, 2 |
+
+#### 3. Temporal Navigation with LAG & LEAD
+- `LAG(column, offset, default)`: Retrieves a value from *N* rows before the current row. Indispensable for computing month-over-month growth:
+$$	ext{MoM Growth} = rac{	ext{Current Revenue} - 	ext{LAG}(	ext{Revenue})}{	ext{LAG}(	ext{Revenue})}$$
+- `LEAD(column, offset, default)`: Retrieves a value from *N* rows ahead. Perfect for calculating duration between consecutive user actions.
+
+#### 4. Running Totals & Moving Averages
+```sql
+SELECT
+    order_date,
+    amount,
+    SUM(amount) OVER (
+        ORDER BY order_date
+        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS running_total,
+    AVG(amount) OVER (
+        ORDER BY order_date
+        ROWS BETWEEN 6 PRECEDING AND CURRENT ROW
+    ) AS rolling_7day_avg
+FROM orders;
+```
+""",
+        "key_rules": "- Always specify ORDER BY inside OVER() when computing running totals or ranks\\n- Use DENSE_RANK() if you require continuous ranking sequences without numerical gaps\\n- Explicitly declare ROWS BETWEEN instead of relying on default RANGE frames to ensure linear runtime\\n- Remember that Window Functions execute AFTER WHERE and GROUP BY, so they cannot be filtered directly in WHERE (use CTEs)",
+        "common_mistakes": "- Attempting to use window functions directly inside a WHERE clause (must wrap in a CTE or subquery)\\n- Forgetting ORDER BY in running sums, causing the function to sum the entire partition rather than a running total\\n- Confusing RANK() with DENSE_RANK() when calculating leaderboards\\n- Neglecting null handling in LAG/LEAD (always provide the 3rd argument default like 0)",
+        "code_examples": [
+            {
+                "title": "Customer MoM Revenue Growth with LAG()",
+                "language": "sql",
+                "code": "WITH monthly_rev AS (\\n    SELECT \\n        DATE_TRUNC('month', order_date) AS order_month,\\n        SUM(revenue) AS monthly_sales\\n    FROM fact_orders\\n    GROUP BY 1\\n)\\nSELECT\\n    order_month,\\n    monthly_sales,\\n    LAG(monthly_sales, 1, monthly_sales) OVER (ORDER BY order_month) AS prev_month_sales,\\n    ROUND(\\n        ((monthly_sales - LAG(monthly_sales, 1, monthly_sales) OVER (ORDER BY order_month))::numeric / \\n        NULLIF(LAG(monthly_sales, 1, monthly_sales) OVER (ORDER BY order_month), 0)) * 100,\\n        2\\n    ) AS mom_growth_pct\\nFROM monthly_rev;",
+                "explanation": "Calculates monthly aggregate sales in a CTE, then utilizes LAG() to compare current month against prior month and compute exact percentage uplift."
+            }
+        ],
+        "worked_example": {
+            "scenario": "A business analytics lead needs to identify the top 2 highest-value orders placed by each corporate account, along with the percentage of that account's total annual spend each order represents.",
+            "code": "WITH ranked_orders AS (\\n    SELECT\\n        account_id,\\n        order_id,\\n        order_date,\\n        order_amount,\\n        DENSE_RANK() OVER (PARTITION BY account_id ORDER BY order_amount DESC) AS spend_rank,\\n        SUM(order_amount) OVER (PARTITION BY account_id) AS total_account_spend\\n    FROM fact_orders\\n)\\nSELECT\\n    account_id,\\n    order_id,\\n    order_amount,\\n    total_account_spend,\\n    ROUND((order_amount / total_account_spend) * 100, 2) AS pct_of_account_spend\\nFROM ranked_orders\\nWHERE spend_rank <= 2\\nORDER BY account_id, spend_rank;",
+            "reasoning": "Step 1: Partition by account_id and rank orders by amount descending with DENSE_RANK(). Step 2: Compute account-wide total spend using SUM() OVER (PARTITION BY account_id). Step 3: Filter rank <= 2 in outer query.",
+            "expected_output": "| account_id | order_id | order_amount | total_account_spend | pct_of_account_spend |\\n| :--- | :--- | :--- | :--- | :--- |\\n| 101 | ORD-9921 | $45,000 | $120,000 | 37.50% |\\n| 101 | ORD-9810 | $35,000 | $120,000 | 29.17% |"
+        },
+        "quick_reference": {
+            "key_terms": [
+                {"term": "Window Partition", "definition": "A subset of rows divided by PARTITION BY over which the function independently calculates."},
+                {"term": "Running Total", "definition": "Cumulative summation from the start of the partition up to the current row."},
+                {"term": "DENSE_RANK()", "definition": "Sequential integer ranking that does not skip numbers when ties occur."},
+                {"term": "LAG() / LEAD()", "definition": "Offset navigation functions to access prior or subsequent row values without self-joins."}
+            ],
+            "formulas_rules": [
+                "LAG Syntax: LAG(col, 1, default) OVER (PARTITION BY ... ORDER BY ...)",
+                "Running sum: SUM(col) OVER (PARTITION BY group ORDER BY date ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)",
+                "To filter on window function results: wrap inside WITH cte AS (...) and filter in outer WHERE"
+            ],
+            "takeaways": [
+                "Window functions never collapse row counts.",
+                "Always wrap in a CTE when you need to filter on a rank or running total."
+            ]
+        },
+        "guided_practice": {
+            "prompt": "Write a SQL query using `ROW_NUMBER() OVER (PARTITION BY department_id ORDER BY salary DESC)` to select the highest-paid employee per department.",
+            "starter_code": "-- Select highest paid employee per department\\nWITH ranked_emp AS (\\n    SELECT id, name, department_id, salary,\\n           -- Your ROW_NUMBER expression here\\n    FROM employees\\n)\\nSELECT id, name, department_id, salary FROM ranked_emp WHERE rnk = 1;",
+            "solution": "WITH ranked_emp AS (\\n    SELECT id, name, department_id, salary,\\n           ROW_NUMBER() OVER (PARTITION BY department_id ORDER BY salary DESC) AS rnk\\n    FROM employees\\n)\\nSELECT id, name, department_id, salary FROM ranked_emp WHERE rnk = 1;",
+            "hints": [
+                "Use ROW_NUMBER() OVER (PARTITION BY department_id ORDER BY salary DESC) AS rnk",
+                "Filter WHERE rnk = 1 in the outer query."
+            ]
+        },
+        "independent_practice": {
+            "prompt": "Write a query computing the 3-day rolling average revenue for an e-commerce platform using `AVG(revenue) OVER (ORDER BY order_date ROWS BETWEEN 2 PRECEDING AND CURRENT ROW)`.",
+            "starter_code": "-- Compute 3-day rolling average revenue\\nSELECT order_date, revenue,\\n       -- Your rolling average expression here\\nFROM daily_revenue;",
+            "solution": "SELECT order_date, revenue,\\n       AVG(revenue) OVER (ORDER BY order_date ROWS BETWEEN 2 PRECEDING AND CURRENT ROW) AS rolling_3day_avg\\nFROM daily_revenue;",
+            "test_criteria": "Uses AVG with OVER (ORDER BY order_date ROWS BETWEEN 2 PRECEDING AND CURRENT ROW)."
+        },
+        "concept_check": [
+            {
+                "question_text": "Why can you NOT filter a window function result directly in the WHERE clause of the same query block?",
+                "options": [
+                    "Window functions are evaluated in logical query processing after WHERE and GROUP BY have already executed",
+                    "Window functions only support integers",
+                    "SQL standards disallow CTEs with window functions",
+                    "The database index cannot locate the column"
+                ],
+                "correct": "Window functions are evaluated in logical query processing after WHERE and GROUP BY have already executed",
+                "explanation": "In standard SQL logical query processing, WHERE evaluates before SELECT window calculations. Filtering requires wrapping in a CTE or subquery."
+            },
+            {
+                "question_text": "Given salaries [100k, 100k, 90k], what ranks are assigned by RANK() vs DENSE_RANK()?",
+                "options": [
+                    "RANK: 1, 1, 3 | DENSE_RANK: 1, 1, 2",
+                    "RANK: 1, 2, 3 | DENSE_RANK: 1, 1, 1",
+                    "RANK: 1, 1, 2 | DENSE_RANK: 1, 1, 3",
+                    "Both assign 1, 1, 2"
+                ],
+                "correct": "RANK: 1, 1, 3 | DENSE_RANK: 1, 1, 2",
+                "explanation": "RANK() skips rank numbers after a tie (leaving a gap), whereas DENSE_RANK() continues sequentially with no gaps."
+            },
+            {
+                "question_text": "What does LAG(revenue, 1, 0) return for the very first row in a partition?",
+                "options": [
+                    "0 (the specified default value)",
+                    "NULL",
+                    "The current row revenue",
+                    "A runtime syntax error"
+                ],
+                "correct": "0 (the specified default value)",
+                "explanation": "Because no preceding row exists for the first element, LAG returns the 3rd argument default (0)."
+            }
+        ],
+        "applied_task": {
+            "role_scenario": "Enterprise SaaS Retention & Cohort Analysis",
+            "task_description": "Analyze recurring monthly subscription revenue. Calculate user-level monthly spend and use LAG to identify expansion, contraction, or churned customers.",
+            "starter_code": "-- Formulate cohort window query\\nSELECT user_id, billing_month, amount FROM subscriptions;",
+            "rubrics": "Correctly partitions by user, orders by month, calculates delta using LAG, and classifies expansion vs contraction."
         }
     },
 ]
@@ -1323,4 +1638,48 @@ LEARNING_RESOURCES_SEED: List[Dict[str, Any]] = [
         "quality_rank": 2,
         "is_active": True,
     },
+
+    # -------------------------------------------------------------------------
+    # Applied Statistics & Hypothesis Testing (Khan Academy, SciPy, GeeksforGeeks)
+    # -------------------------------------------------------------------------
+    {
+        "title": "Khan Academy: Significance Tests & One-Sample Hypothesis Testing",
+        "provider": "Khan Academy",
+        "url": "https://www.khanacademy.org/math/statistics-probability/significance-tests-one-sample",
+        "skill_name": "Statistics",
+        "concept_slug": "statistics-hypothesis-testing",
+        "role_name": "All",
+        "difficulty": "Beginner",
+        "resource_type": "Structured Course & Practice",
+        "estimated_minutes": 35,
+        "quality_rank": 2,
+        "is_active": True,
+    },
+    {
+        "title": "SciPy Official Documentation: Statistical Tests & Distributions (scipy.stats)",
+        "provider": "SciPy Official Documentation",
+        "url": "https://docs.scipy.org/doc/scipy/reference/stats.html",
+        "skill_name": "Statistics",
+        "concept_slug": "statistics-hypothesis-testing",
+        "role_name": "All",
+        "difficulty": "Intermediate",
+        "resource_type": "Official Documentation",
+        "estimated_minutes": 25,
+        "quality_rank": 1,
+        "is_active": True,
+    },
+    {
+        "title": "GeeksforGeeks: P-Value in Statistics & Hypothesis Testing in Python",
+        "provider": "GeeksforGeeks",
+        "url": "https://www.geeksforgeeks.org/p-value/",
+        "skill_name": "Statistics",
+        "concept_slug": "statistics-hypothesis-testing",
+        "role_name": "All",
+        "difficulty": "Intermediate",
+        "resource_type": "Educational Platform & Code Examples",
+        "estimated_minutes": 20,
+        "quality_rank": 2,
+        "is_active": True,
+    },
 ]
+

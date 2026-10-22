@@ -45,6 +45,13 @@ class LearningService:
         role = db.query(Role).filter(Role.id == target_role_id).first()
         role_name = role.name if role else "Data Analyst"
 
+        # 1. Deterministic Learner Level Gate (Beginner -> Intermediate -> Advanced)
+        raw_level = (user.experience_level or "Beginner").strip().capitalize()
+        if raw_level not in ["Beginner", "Intermediate", "Advanced"]:
+            learner_level = "Beginner"
+        else:
+            learner_level = raw_level
+
         # Load role profile and required skills from backend curriculum engine
         role_profile = role_curriculum_engine.get_role_profile(role_name)
         active_role_name = role_profile.get("role_name", role_name)
@@ -68,6 +75,10 @@ class LearningService:
             .all()
         )
 
+        def get_mod_level(mod: LearningModule) -> str:
+            d = (mod.difficulty or "Intermediate").strip().capitalize()
+            return d if d in ["Beginner", "Intermediate", "Advanced"] else "Intermediate"
+
         # Role-specific filtering: determine if module belongs to active role's curriculum
         def is_module_relevant_to_role(mod: LearningModule) -> bool:
             mod_role_targets = [r.strip().lower() for r in mod.target_role_name.split(",")]
@@ -78,6 +89,11 @@ class LearningService:
             # If targeted to another specific role (e.g. Python Developer vs Data Analyst), exclude
             explicit_other_roles = [r for r in mod_role_targets if r not in ["all", ""]]
             if explicit_other_roles and active_role_name.lower() not in explicit_other_roles:
+                return False
+
+            # Python Developer has dedicated software engineering curriculum (python-core-fundamentals, etc.)
+            # Exclude data analysis pipeline modules that are not part of backend Python engineering
+            if active_role_name == "Python Developer" and mod.slug in ["python-pandas-pipelines", "sql-joins-mastery"]:
                 return False
 
             # If marked 'All', check if module's skill is required for this role
@@ -135,71 +151,191 @@ class LearningService:
                 if s.module_slug:
                     roadmap_slug_priority[s.module_slug] = s.order_index
 
-        # Map module slugs to their completion/mastery status
         slug_to_module = {m.slug: m for m in all_modules}
         slug_mastery_map: Dict[str, bool] = {}
+        slug_gap_map: Dict[str, bool] = {}
 
+        # 2. Evaluate concept mastery and verified gaps
         for m in all_modules:
             p = progress_map.get(m.id)
             skill_dna = dna_map.get(m.skill_id, {})
             skill_level = skill_dna.get("skill_level", 0.0)
+            evidence_count = skill_dna.get("evidence_count", 0)
             debt_info = debt_map.get(m.skill_id, {})
-            severity = debt_info.get("severity", "")
+            debt_severity = debt_info.get("severity", "")
             debt_score = debt_info.get("debt_score", 0.0)
             debt_status = debt_info.get("debt_status", "")
 
             has_critical_debt = (
-                (severity in ["CRITICAL", "HIGH"] or debt_score >= 35.0 or debt_status == "CRITICAL")
+                debt_severity in ["CRITICAL", "HIGH"] or debt_score >= 35.0 or debt_status == "CRITICAL"
             )
 
-            is_prereq_satisfied = False
-            if p and p.status in ["MASTERED", "CHECK_PENDING"]:
-                is_prereq_satisfied = True
-            elif skill_level >= 65.0 and not has_critical_debt and skill_dna.get("evidence_count", 0) > 0:
-                is_prereq_satisfied = True
+            # Concept is mastered if explicitly completed or proven via strong assessment evidence
+            is_mastered = False
+            if p and (p.status == "MASTERED" or p.concept_check_passed):
+                is_mastered = True
+            elif skill_level >= 75.0 and evidence_count > 0 and not has_critical_debt:
+                is_mastered = True
 
-            slug_mastery_map[m.slug] = is_prereq_satisfied
+            slug_mastery_map[m.slug] = is_mastered
+
+            # A verified gap exists if the learner failed an attempt, or has critical debt with evidence/attempts
+            has_gap = False
+            if p and (p.status == "REMEDIATION" or (p.concept_check_attempts > 0 and not p.concept_check_passed)):
+                has_gap = True
+            elif has_critical_debt and (evidence_count > 0 or (p and p.concept_check_attempts > 0)):
+                has_gap = True
+
+            slug_gap_map[m.slug] = has_gap
+
+        # 3. Categorize role modules by canonical levels
+        role_beginner_mods = [m for m in filtered_modules if get_mod_level(m) == "Beginner"]
+        role_intermediate_mods = [m for m in filtered_modules if get_mod_level(m) == "Intermediate"]
+        role_advanced_mods = [m for m in filtered_modules if get_mod_level(m) == "Advanced"]
+
+        beginner_cleared = len(role_beginner_mods) == 0 or all(
+            slug_mastery_map.get(bm.slug, False) for bm in role_beginner_mods
+        )
+        intermediate_cleared = len(role_intermediate_mods) == 0 or all(
+            slug_mastery_map.get(im.slug, False) for im in role_intermediate_mods
+        )
+
+        def get_all_prereq_slugs(mod_slug: str, visited: Optional[set] = None) -> List[str]:
+            if visited is None:
+                visited = set()
+            if mod_slug in visited:
+                return []
+            visited.add(mod_slug)
+            mod_obj = slug_to_module.get(mod_slug)
+            if not mod_obj or not mod_obj.prerequisite_concept_slugs:
+                return []
+            direct = [s.strip() for s in mod_obj.prerequisite_concept_slugs.split(",") if s.strip()]
+            all_p = list(direct)
+            for d in direct:
+                all_p.extend(get_all_prereq_slugs(d, visited))
+            return list(dict.fromkeys(all_p))
+
+        # Identify targeted prerequisite refreshers needed for Intermediate / Advanced
+        targeted_refresher_slugs = set()
+        if learner_level in ["Intermediate", "Advanced"]:
+            eligible_pool = role_intermediate_mods if learner_level == "Intermediate" else role_advanced_mods
+            for mod in eligible_pool:
+                all_ancestors = get_all_prereq_slugs(mod.slug)
+                for ps in all_ancestors:
+                    ps_mod = slug_to_module.get(ps)
+                    if ps_mod:
+                        ps_lvl = get_mod_level(ps_mod)
+                        if learner_level == "Intermediate" and ps_lvl == "Beginner" and slug_gap_map.get(ps, False):
+                            targeted_refresher_slugs.add(ps)
+                        elif learner_level == "Advanced" and ps_lvl in ["Beginner", "Intermediate"] and slug_gap_map.get(ps, False):
+                            targeted_refresher_slugs.add(ps)
 
         summaries: List[LearningModuleSummary] = []
 
         for m in filtered_modules:
             p = progress_map.get(m.id)
             skill_name = m.skill.name if m.skill else "Skill"
-            skill_dna = dna_map.get(m.skill_id, {})
-            skill_level = skill_dna.get("skill_level", 0.0)
-            debt_info = debt_map.get(m.skill_id, {})
-            severity = debt_info.get("severity", "")
-            debt_score = debt_info.get("debt_score", 0.0)
-            debt_status = debt_info.get("debt_status", "")
+            m_level = get_mod_level(m)
+            has_gap = slug_gap_map.get(m.slug, False)
+            is_mastered = slug_mastery_map.get(m.slug, False)
+            is_targeted_refresher = m.slug in targeted_refresher_slugs
 
-            has_critical_debt = (
-                (severity in ["CRITICAL", "HIGH"] or debt_score >= 35.0 or debt_status == "CRITICAL")
-            )
-
-            # Prerequisite evaluation
+            # Prerequisite checks
             prereq_slugs = [s.strip() for s in (m.prerequisite_concept_slugs or "").split(",") if s.strip()]
-            blocking_prereqs = [ps for ps in prereq_slugs if not slug_mastery_map.get(ps, False)]
+            blocking_prereqs = []
 
-            is_locked = len(blocking_prereqs) > 0
+            # Check unmastered refreshers among ancestors
+            ancestors = get_all_prereq_slugs(m.slug)
+            unmastered_refreshers = [
+                ps for ps in ancestors if ps in targeted_refresher_slugs and not slug_mastery_map.get(ps, False)
+            ]
+
+            if unmastered_refreshers:
+                blocking_prereqs.extend(unmastered_refreshers)
+            else:
+                for ps in prereq_slugs:
+                    ps_mod = slug_to_module.get(ps)
+                    ps_lvl = get_mod_level(ps_mod) if ps_mod else "Beginner"
+
+                    if learner_level == "Beginner":
+                        # Strictly require mastery of earlier prerequisites
+                        if not slug_mastery_map.get(ps, False):
+                            blocking_prereqs.append(ps)
+                    elif learner_level == "Intermediate":
+                        if ps_lvl == "Beginner":
+                            # If beginner prerequisite has a verified gap, it blocks until refresher is done
+                            if slug_gap_map.get(ps, False) and not slug_mastery_map.get(ps, False):
+                                blocking_prereqs.append(ps)
+                        else:
+                            # Intermediate prerequisites follow normal dependency
+                            if not slug_mastery_map.get(ps, False):
+                                blocking_prereqs.append(ps)
+                    elif learner_level == "Advanced":
+                        if ps_lvl in ["Beginner", "Intermediate"]:
+                            if slug_gap_map.get(ps, False) and not slug_mastery_map.get(ps, False):
+                                blocking_prereqs.append(ps)
+                        else:
+                            if not slug_mastery_map.get(ps, False):
+                                blocking_prereqs.append(ps)
+
+            # Level Gate Enforcement
+            level_locked = False
+            level_lock_reason = None
+
+            if learner_level == "Beginner":
+                if m_level == "Intermediate" and not beginner_cleared:
+                    level_locked = True
+                    level_lock_reason = "Complete all Beginner level modules first to unlock Intermediate concepts."
+                elif m_level == "Advanced":
+                    level_locked = True
+                    level_lock_reason = "Complete Beginner and Intermediate modules first to unlock Advanced concepts."
+            elif learner_level == "Intermediate":
+                if m_level == "Advanced" and not intermediate_cleared:
+                    level_locked = True
+                    level_lock_reason = "Complete all Intermediate level modules first to unlock Advanced concepts."
+            elif learner_level == "Advanced":
+                # Advanced learner directly accesses Advanced modules (unless targeted refresher required)
+                pass
+
+            is_locked = level_locked or len(blocking_prereqs) > 0
             unlock_reason = None
-            if is_locked:
+            if level_locked:
+                unlock_reason = level_lock_reason
+            elif blocking_prereqs:
                 blocking_names = [
-                    slug_to_module[ps].concept_name if ps in slug_to_module else ps
+                    slug_to_module[ps].title if ps in slug_to_module else ps
                     for ps in blocking_prereqs
                 ]
                 unlock_reason = f"Prerequisites required: {', '.join(blocking_names)}"
 
-            # Resolve status
+            # Status resolution
             status = "LOCKED" if is_locked else "AVAILABLE"
-            if not is_locked:
-                if p and p.status == "REMEDIATION":
-                    status = "REMEDIATION"
-                elif has_critical_debt and (m.order_index > 1 or (p and p.concept_check_attempts > 0)):
-                    status = "REMEDIATION"
-                elif p:
-                    status = p.status
-                elif skill_level >= 75.0 and skill_dna.get("evidence_count", 0) > 0:
-                    status = "MASTERED"
+            is_rescue = False
+            rescue_reason = None
+            recommended_action_label = "Start Learning"
+
+            if is_locked:
+                status = "LOCKED"
+                recommended_action_label = "Locked"
+            elif is_targeted_refresher:
+                status = "REMEDIATION"
+                is_rescue = True
+                rescue_reason = f"Prerequisite gap: Complete {m.title} refresher before continuing with {learner_level} concepts."
+                recommended_action_label = "Prerequisite Refresher"
+            elif p and (p.status == "REMEDIATION" or (p.concept_check_attempts > 0 and not p.concept_check_passed)):
+                status = "REMEDIATION"
+                is_rescue = True
+                rescue_reason = f"Concept check score below passing threshold ({m.passing_threshold}%): Targeted rescue drill required."
+                recommended_action_label = f"Start {m_level} Rescue Drill"
+            elif p and p.status in ["LEARNING", "PRACTICING", "CHECK_PENDING", "DEVELOPING"]:
+                status = p.status
+                recommended_action_label = "Continue Learning"
+            elif is_mastered:
+                status = "MASTERED"
+                recommended_action_label = "Review Module"
+            else:
+                status = "AVAILABLE"
+                recommended_action_label = "Start Learning"
 
             summaries.append(
                 LearningModuleSummary(
@@ -209,7 +345,7 @@ class LearningService:
                     skill_name=skill_name,
                     title=m.title,
                     concept_name=m.concept_name,
-                    difficulty=m.difficulty,
+                    difficulty=m_level,
                     estimated_minutes=m.estimated_minutes,
                     order_index=m.order_index,
                     status=status,
@@ -221,26 +357,84 @@ class LearningService:
                     applied_task_completed=p.applied_task_completed if p else False,
                     is_locked=is_locked,
                     unlock_reason=unlock_reason,
+                    level=m_level,
+                    is_rescue=is_rescue,
+                    is_targeted_refresher=is_targeted_refresher,
+                    rescue_reason=rescue_reason,
+                    recommended_action_label=recommended_action_label,
                 )
             )
 
-        # Dynamic sequence matching roadmap priority and skill debt
+        pathway = role_profile.get("baseline_pathway", [])
+        skill_pathway_order = {s.lower(): idx for idx, s in enumerate(pathway)}
+
+        def get_pathway_rank(mod_skill_name: str, mod_slug: str) -> int:
+            slug_rank_override = {
+                "python-core-fundamentals": 0,
+                "python-collections-functions": 1,
+            }
+            if active_role_name == "Python Developer" and mod_slug in slug_rank_override:
+                return slug_rank_override[mod_slug]
+
+            s = mod_skill_name.lower()
+            if s in skill_pathway_order:
+                return skill_pathway_order[s]
+            alias_map = {
+                "python": ["python basics", "python"],
+                "python basics": ["python", "python basics"],
+                "sql": ["sql basics", "sql"],
+                "sql basics": ["sql", "sql basics"],
+                "data structures": ["python basics", "python", "data structures"],
+            }
+            for alias in alias_map.get(s, []):
+                if alias in skill_pathway_order:
+                    return skill_pathway_order[alias]
+            return 999
+
+        # Dynamic sequence priority key
         def module_priority_key(item: LearningModuleSummary) -> tuple:
+            pw_rank = get_pathway_rank(item.skill_name, item.slug)
+
+            # Group 0: Targeted prerequisite refreshers
+            if item.is_targeted_refresher:
+                return (0, 0, pw_rank, item.order_index)
+
+            # Group 1: Active rescue drill within current level
+            if item.status == "REMEDIATION" and item.level == learner_level:
+                return (1, 0, pw_rank, item.order_index)
+
+            # Group 2: In-progress modules at current level
+            if item.level == learner_level and item.status in ["LEARNING", "PRACTICING", "CHECK_PENDING", "DEVELOPING"]:
+                return (2, 0, pw_rank, item.order_index)
+
+            # Group 3: Available modules at current level
+            if item.level == learner_level and item.status == "AVAILABLE":
+                rm_rank = roadmap_slug_priority.get(item.slug, pw_rank)
+                return (3, rm_rank, pw_rank, item.order_index)
+
+            # Group 4: Mastered modules at current level
+            if item.level == learner_level and item.status == "MASTERED":
+                return (4, pw_rank, item.order_index)
+
+            # Group 5: Other active levels (progression downstream or upstream)
+            level_rank = {"Beginner": 1, "Intermediate": 2, "Advanced": 3}
+            l_diff = level_rank.get(item.level, 2) - level_rank.get(learner_level, 1)
+
             if item.status == "REMEDIATION":
-                return (0, 0)
-            if item.slug in roadmap_slug_priority:
-                return (1, roadmap_slug_priority[item.slug])
+                return (5, abs(l_diff), pw_rank, item.order_index)
             if item.status in ["AVAILABLE", "LEARNING", "PRACTICING"]:
-                return (2, item.order_index)
+                return (6, l_diff if l_diff > 0 else 10 + abs(l_diff), pw_rank, item.order_index)
             if item.status == "MASTERED":
-                return (3, item.order_index)
-            return (4, item.order_index)
+                return (7, l_diff, pw_rank, item.order_index)
+
+            # Group 8: Locked modules
+            return (8, level_rank.get(item.level, 2), pw_rank, item.order_index)
 
         summaries.sort(key=module_priority_key)
         return summaries
 
     def get_module_detail(
-        self, db: Session, user_id: int, identifier: str
+        self, db: Session, user_id: int, identifier: str, level: Optional[str] = None
     ) -> LearningModuleDetail:
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
@@ -265,24 +459,31 @@ class LearningService:
         if not module:
             raise HTTPException(status_code=404, detail=f"Learning module '{identifier}' not found.")
 
-        # STRICT BACKEND ENFORCEMENT: Check prerequisites
-        prereq_slugs = [s.strip() for s in (module.prerequisite_concept_slugs or "").split(",") if s.strip()]
-        if prereq_slugs:
-            # Check user mastery on each prerequisite
-            all_summaries = self.get_modules_for_user(db, user_id, user.target_role_id)
-            summary_map = {s.slug: s for s in all_summaries}
-
-            unmet_prereqs = []
-            for ps in prereq_slugs:
-                target_sum = summary_map.get(ps)
-                if not target_sum or target_sum.status not in ["MASTERED", "DEVELOPING"]:
-                    unmet_prereqs.append(target_sum.concept_name if target_sum else ps)
-
-            if unmet_prereqs:
+        # STRICT BACKEND ENFORCEMENT: Check prerequisites & level gate
+        all_summaries = self.get_modules_for_user(db, user_id, user.target_role_id)
+        summary_map = {s.slug: s for s in all_summaries}
+        mod_sum = summary_map.get(module.slug)
+        if mod_sum:
+            if mod_sum.is_locked:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Concept is locked. You must complete prerequisites first: {', '.join(unmet_prereqs)}.",
+                    detail=f"Concept is locked. {mod_sum.unlock_reason or 'Complete earlier prerequisites first.'}",
                 )
+        else:
+            # Module is outside active role or an advanced prerequisite module
+            # Strictly check prerequisite concepts
+            prereq_slugs = [s.strip() for s in (module.prerequisite_concept_slugs or "").split(",") if s.strip()]
+            if prereq_slugs:
+                unmet = []
+                for ps in prereq_slugs:
+                    target_sum = summary_map.get(ps)
+                    if not target_sum or target_sum.status not in ["MASTERED", "DEVELOPING"]:
+                        unmet.append(target_sum.concept_name if target_sum else ps)
+                if unmet:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=f"Concept is locked. You must complete prerequisites first: {', '.join(unmet)}.",
+                    )
 
         # Get or create progress
         progress = (
@@ -313,6 +514,9 @@ class LearningService:
             progress.updated_at = datetime.utcnow()
             db.commit()
 
+        # Resolve skill name safely
+        module_skill_name = module.skill.name if module.skill else "Core Skill"
+
         # Parse JSON structures
         objectives = json.loads(module.learning_objectives) if module.learning_objectives else []
         worked_ex = json.loads(module.worked_example) if module.worked_example else {}
@@ -334,7 +538,7 @@ class LearningService:
         indep_pr["starter_code"] = indep_pr.get("starter_code") or indep_pr.get("initial_code", "")
 
         applied_tk = json.loads(module.applied_task) if module.applied_task else {}
-        applied_tk["title"] = applied_tk.get("title") or applied_tk.get("role_scenario") or f"Production {module.skill_name} Task"
+        applied_tk["title"] = applied_tk.get("title") or applied_tk.get("role_scenario") or f"Production {module_skill_name} Task"
         applied_tk["role_relevance"] = applied_tk.get("role_relevance") or applied_tk.get("role_scenario") or f"Target Role: {module.target_role_name}"
         applied_tk["business_context"] = applied_tk.get("business_context") or applied_tk.get("task_description", "")
         applied_tk["task_prompt"] = applied_tk.get("task_prompt") or applied_tk.get("starter_code") or applied_tk.get("task_description", "")
@@ -409,6 +613,149 @@ class LearningService:
             for r in sorted_resources
         ]
 
+        # Comprehensive Structural Extensions (Phase 21)
+        subtopics = json.loads(module.subtopics) if module.subtopics else [
+            {"id": "objectives", "title": "1. What You Will Learn"},
+            {"id": "why-it-matters", "title": "2. Why This Matters for Your Role"},
+            {"id": "conceptual-foundation", "title": "3. Conceptual Foundation & Intuition"},
+            {"id": "step-by-step", "title": "4. Step-by-Step Breakdown & Mathematical Rigor"},
+            {"id": "code-examples", "title": "5. Practical Syntax-Highlighted Examples"},
+            {"id": "worked-example", "title": "6. Complete Step-by-Step Worked Problem"},
+            {"id": "common-mistakes", "title": "7. Common Industry Pitfalls & Fallacies"},
+            {"id": "quick-reference", "title": "8. Quick Reference Revision Sheet"},
+            {"id": "practice", "title": "9. Guided & Independent Practice Lab"},
+            {"id": "concept-check", "title": "10. Formative Concept Check (3-5 Questions)"},
+            {"id": "applied-task", "title": "11. Production Role Task & Evidence"},
+            {"id": "resources", "title": "12. Verified Authoritative External References"},
+        ]
+
+        why_matters_map = json.loads(module.why_it_matters_by_role) if module.why_it_matters_by_role else {
+            "Data Analyst": f"Mastering {module.concept_name} allows Data Analysts to extract trustworthy business insights, evaluate KPIs rigorously, and prevent flawed executive decisions driven by noisy data.",
+            "Data Scientist": f"For Data Scientists, {module.concept_name} provides the mathematical and algorithmic rigor necessary for robust predictive modeling, experiment evaluation, and reproducible machine learning.",
+            "Python Developer": f"For Python Developers, {module.concept_name} ensures defensive architecture, high-performance data processing, clean APIs, and production reliability without unhandled edge cases.",
+        }
+
+        code_examples = json.loads(module.code_examples) if module.code_examples else (
+            [
+                {
+                    "title": f"Implementation: {module.concept_name}",
+                    "language": "python" if "python" in module.slug or "eda" in module.slug or "machine" in module.slug or "stat" in module.slug else "sql",
+                    "code": worked_ex.get("code_or_query", ""),
+                    "explanation": worked_ex.get("explanation", ""),
+                }
+            ] if worked_ex.get("code_or_query") else []
+        )
+
+        quick_reference = json.loads(module.quick_reference) if module.quick_reference else {
+            "key_terms": [
+                {"term": module.concept_name, "definition": f"Core competency within {module_skill_name}."}
+            ],
+            "formulas_rules": [r.strip() for r in (module.key_rules or "").split("\n") if r.strip()],
+            "takeaways": [
+                f"Verify assumptions and edge cases before deploying {module.concept_name}.",
+                "Always measure outcomes with realistic test criteria and evidence."
+            ]
+        }
+
+        level_variations = json.loads(module.level_variations) if module.level_variations else {
+            "Beginner": {
+                "level": "Beginner",
+                "focus": "Core Intuition & Fundamental Mental Models",
+                "prerequisite_recap": "Starts from fundamental concepts without assuming deep advanced prerequisites.",
+                "explanation_supplement": f"Focuses on intuitive understanding, simple everyday analogies, and elementary syntax for {module.concept_name}.",
+                "key_additions": ["Intuitive mental models", "Step-by-step breakdown", "Terminology clarification"]
+            },
+            "Intermediate": {
+                "level": "Intermediate",
+                "focus": "Standard Industry Workflows, Mechanics & Best Practices",
+                "prerequisite_recap": "Assumes fundamental literacy; focuses on practical implementations and common mistakes.",
+                "explanation_supplement": f"Covers standard production mechanics, edge cases, and role-specific applications of {module.concept_name}.",
+                "key_additions": ["Idiomatic production code", "Error handling and edge cases", "Role-specific business context"]
+            },
+            "Advanced": {
+                "level": "Advanced",
+                "focus": "High-Throughput Optimization, System Architecture & Advanced Theory",
+                "prerequisite_recap": "Assumes complete working familiarity; targets trade-offs, scalability, and deep limits.",
+                "explanation_supplement": f"Explores statistical power, performance bottlenecks, non-parametric alternatives, and enterprise architectural patterns for {module.concept_name}.",
+                "key_additions": ["Architectural edge cases", "Performance profiling and trade-offs", "Production deployment rigor"]
+            }
+        }
+
+        # Calculate user's effective level for this skill
+        dna_list = skill_dna_service.get_user_skill_dna(db, user_id)
+        dna_map = {d["skill_id"]: d for d in dna_list}
+        skill_dna = dna_map.get(module.skill_id, {})
+        skill_score = skill_dna.get("skill_level", 0.0)
+        user_exp = (user.experience_level or "intermediate").lower()
+
+        if level and level.capitalize() in ["Beginner", "Intermediate", "Advanced"]:
+            effective_level = level.capitalize()
+        elif user_exp == "beginner" or (skill_score < 45.0 and skill_dna.get("evidence_count", 0) > 0):
+            effective_level = "Beginner"
+        elif user_exp == "advanced" or skill_score >= 80.0:
+            effective_level = "Advanced"
+        else:
+            effective_level = "Intermediate"
+
+        # Adaptive next action calculation
+        if progress.status in ["AVAILABLE", "NOT_STARTED"]:
+            adaptive_action = {
+                "action_type": "START_LEARNING",
+                "label": "Begin Conceptual Study",
+                "target_tab": "LEARN",
+                "description": "Read the structured conceptual foundation, intuitive mental models, and worked examples."
+            }
+        elif progress.status == "LEARNING":
+            adaptive_action = {
+                "action_type": "START_PRACTICE",
+                "label": "Start Practice Drill",
+                "target_tab": "PRACTICE",
+                "description": "Solidify your understanding by writing and testing code in the interactive drill."
+            }
+        elif progress.status == "PRACTICING":
+            if progress.practice_score >= 60.0:
+                adaptive_action = {
+                    "action_type": "TAKE_CHECK",
+                    "label": "Take Formative Concept Check",
+                    "target_tab": "CHECK",
+                    "description": "You scored well in practice! Validate foundational mastery through the 3-5 question check."
+                }
+            else:
+                adaptive_action = {
+                    "action_type": "RETRY_PRACTICE",
+                    "label": "Continue Practice Drills",
+                    "target_tab": "PRACTICE",
+                    "description": "Complete independent practice drill to reach minimum passing readiness."
+                }
+        elif progress.status == "CHECK_PENDING" or (progress.concept_check_passed and not progress.applied_task_completed):
+            adaptive_action = {
+                "action_type": "APPLY_TASK",
+                "label": "Execute Applied Role Task",
+                "target_tab": "APPLY",
+                "description": "Prove end-to-end competency in a production scenario tailored to your target role."
+            }
+        elif progress.status == "MASTERED":
+            adaptive_action = {
+                "action_type": "ADVANCE_ROADMAP",
+                "label": "Advance to Next Roadmap Milestone",
+                "target_tab": "LEARN",
+                "description": "You have mastered this concept! Explore external resources for deeper mastery or proceed to the next milestone."
+            }
+        elif progress.status == "REMEDIATION":
+            adaptive_action = {
+                "action_type": "REMEDIATE",
+                "label": "Review Prerequisite Concepts",
+                "target_tab": "LEARN",
+                "description": "Active skill debt detected. Reinforce core prerequisites to repair confidence."
+            }
+        else:
+            adaptive_action = {
+                "action_type": "START_LEARNING",
+                "label": "Continue Learning",
+                "target_tab": "LEARN",
+                "description": "Review module contents and practice drills."
+            }
+
         return LearningModuleDetail(
             id=module.id,
             slug=module.slug,
@@ -426,6 +773,13 @@ class LearningService:
             explanation=module.explanation,
             key_rules=module.key_rules,
             common_mistakes=module.common_mistakes,
+            subtopics=subtopics,
+            why_it_matters_by_role=why_matters_map,
+            code_examples=code_examples,
+            quick_reference=quick_reference,
+            level_variations=level_variations,
+            adaptive_next_action=adaptive_action,
+            effective_level=effective_level,
             worked_example=worked_ex,
             guided_practice=guided_pr,
             independent_practice=indep_pr,

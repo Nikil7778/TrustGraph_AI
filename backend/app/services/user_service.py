@@ -101,7 +101,7 @@ class UserService:
             from app.services.roadmap_service import roadmap_service
             roadmap_service.rebuild_user_roadmap(db, user_id, user.target_role_id)
 
-        return user
+        return self.get_user_by_id(db, user_id) or user
 
     def get_user_skills(self, db: Session, user_id: int) -> List[UserSkill]:
         return (

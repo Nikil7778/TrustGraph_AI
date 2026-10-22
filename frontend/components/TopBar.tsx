@@ -3,9 +3,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, Bell, ChevronDown, UserPlus, RotateCcw, User, Settings, LogOut } from 'lucide-react';
+import { Menu, Bell, ChevronDown, User, Settings, LogOut } from 'lucide-react';
 import { useLearner } from '../context/LearnerContext';
-import { api } from '../services/api';
+import { getInitials } from '../lib/utils';
 
 interface TopBarProps {
   onOpenMobileMenu?: () => void;
@@ -13,7 +13,7 @@ interface TopBarProps {
 
 export const TopBar: React.FC<TopBarProps> = ({ onOpenMobileMenu }) => {
   const pathname = usePathname();
-  const { activeUserId, activeUser, allUsers, setActiveUserId, isDemoMode, logout } = useLearner();
+  const { activeUserId, activeUser, logout } = useLearner();
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -30,14 +30,13 @@ export const TopBar: React.FC<TopBarProps> = ({ onOpenMobileMenu }) => {
     };
   }, []);
 
-  // Display user information
-  const displayName = activeUser?.name || (isDemoMode ? 'Alex Mercer' : `Learner #${activeUserId}`);
-  const targetRole = activeUser?.target_role?.name || 'Data Analyst';
-  const initial = activeUser?.name ? activeUser.name.trim()[0].toUpperCase() : (isDemoMode ? 'A' : 'N');
+  // Display user information — always derived from the authenticated activeUser
+  const displayName = activeUser?.name || (activeUser?.email ? activeUser.email.split('@')[0] : `Learner #${activeUserId}`);
+  const initials = getInitials(activeUser?.name || displayName);
 
   // Breadcrumb logic matching Stitch reference
   const getBreadcrumb = () => {
-    if (pathname === '/') return 'Target Role • ' + targetRole;
+    if (pathname === '/') return 'Target Role • ' + (activeUser?.target_role?.name || 'Dashboard');
     if (pathname?.startsWith('/skill-debt')) return 'SkillPath AI / Skill Debt';
     if (pathname?.startsWith('/skill-dna')) return 'SkillPath AI / Competence Matrix';
     if (pathname?.startsWith('/roadmap')) return 'SkillPath AI / Analytics Console';
@@ -101,7 +100,7 @@ export const TopBar: React.FC<TopBarProps> = ({ onOpenMobileMenu }) => {
               />
             ) : (
               <div className="w-8 h-8 rounded-full bg-slate-900 text-white font-bold text-xs flex items-center justify-center border border-slate-700 shadow-2xs shrink-0">
-                {initial}
+                {initials}
               </div>
             )}
             <div className="hidden xl:block text-left">
