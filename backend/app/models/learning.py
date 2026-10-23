@@ -122,6 +122,8 @@ class LearningResource(Base):
     resource_type = Column(String(50), default="Official Documentation", nullable=False)  # Official Documentation, Interactive Tutorial, Reference Guide
     estimated_minutes = Column(Integer, default=20, nullable=False)
     quality_rank = Column(Integer, default=1, nullable=False)  # 1 = Tier 1 (Official), 2 = Tier 2 (Platform)
+    description = Column(String(500), nullable=True)
+    verified = Column(Boolean, default=True, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 

@@ -10,6 +10,7 @@ from app.models.role import Role, RoleSkill
 from app.models.skill import Skill
 from app.models.evidence import SkillEvidence
 from app.models.roadmap import Roadmap, RoadmapStep
+from app.models.resource_preference import UserResourcePreference
 from app.services.skill_dna_service import skill_dna_service
 from app.services.skill_debt_service import skill_debt_service
 from app.services.roadmap_service import roadmap_service
@@ -172,9 +173,10 @@ class LearningService:
 
             # Concept is mastered if explicitly completed or proven via strong assessment evidence
             is_mastered = False
+            ev_score = skill_dna.get("evidence_score", 0.0)
             if p and (p.status == "MASTERED" or p.concept_check_passed):
                 is_mastered = True
-            elif skill_level >= 75.0 and evidence_count > 0 and not has_critical_debt:
+            elif skill_level >= 75.0 and (evidence_count > 0 or ev_score > 0) and not has_critical_debt:
                 is_mastered = True
 
             slug_mastery_map[m.slug] = is_mastered
@@ -517,13 +519,32 @@ class LearningService:
         # Resolve skill name safely
         module_skill_name = module.skill.name if module.skill else "Core Skill"
 
-        # Parse JSON structures
-        objectives = json.loads(module.learning_objectives) if module.learning_objectives else []
-        worked_ex = json.loads(module.worked_example) if module.worked_example else {}
+        # Check for authoritative first-party content enhancement
+        from app.seed.comprehensive_learning_content import COMPREHENSIVE_MODULE_ENHANCEMENTS
+        enh = COMPREHENSIVE_MODULE_ENHANCEMENTS.get(module.slug) or {}
+
+        # Parse JSON structures with comprehensive enhancement overlay
+        objectives = enh.get("learning_objectives") or (json.loads(module.learning_objectives) if module.learning_objectives else [])
+        explanation_content = enh.get("explanation") or module.explanation
+        key_rules_content = enh.get("key_rules") or module.key_rules
+        common_mistakes_content = enh.get("common_mistakes") or module.common_mistakes
+        if isinstance(common_mistakes_content, (list, dict)):
+            common_mistakes_content = json.dumps(common_mistakes_content)
+
+        worked_ex = enh.get("worked_example") or (json.loads(module.worked_example) if module.worked_example else {})
         worked_ex["title"] = worked_ex.get("title") or f"{module.title} — Real-World Scenario"
-        worked_ex["code_or_query"] = worked_ex.get("code_or_query") or worked_ex.get("code", "")
-        worked_ex["explanation"] = worked_ex.get("explanation") or worked_ex.get("reasoning", "")
-        worked_ex["output"] = worked_ex.get("output") or worked_ex.get("expected_output", "")
+        worked_ex["problem"] = worked_ex.get("problem") or worked_ex.get("scenario", "")
+        worked_ex["approach"] = worked_ex.get("approach", "")
+        worked_ex["code_or_query"] = worked_ex.get("code_or_query") or worked_ex.get("code") or worked_ex.get("solution", "")
+        worked_ex["code"] = worked_ex.get("code") or worked_ex["code_or_query"]
+        worked_ex["solution"] = worked_ex.get("solution") or worked_ex["code_or_query"]
+        worked_ex["explanation"] = worked_ex.get("explanation") or worked_ex.get("reasoning") or worked_ex.get("why_it_works", "")
+        worked_ex["reasoning"] = worked_ex["explanation"]
+        worked_ex["why_it_works"] = worked_ex.get("why_it_works") or worked_ex["explanation"]
+        worked_ex["output"] = worked_ex.get("output") or worked_ex.get("expected_output") or worked_ex.get("result", "")
+        worked_ex["expected_output"] = worked_ex["output"]
+        worked_ex["result"] = worked_ex.get("result") or worked_ex["output"]
+        worked_ex["alternative"] = worked_ex.get("alternative") or worked_ex.get("common_alternative", "")
 
         guided_pr = json.loads(module.guided_practice) if module.guided_practice else {}
         guided_pr["title"] = guided_pr.get("title") or f"Guided Drill: {module.concept_name}"
@@ -570,6 +591,17 @@ class LearningService:
             else role_curriculum_engine.get_role_profile(user.target_role_id or 1)["role_name"]
         )
 
+        # Load learner's platform preference (Phase 21) — presentation layer only
+        pref_record = db.query(UserResourcePreference).filter(
+            UserResourcePreference.user_id == user_id
+        ).first()
+        preferred_primary = (pref_record.primary_platform if pref_record else None) or "no_preference"
+        preferred_secondary = set(
+            [p.strip() for p in pref_record.secondary_platforms.split(",") if p.strip()]
+            if pref_record and pref_record.secondary_platforms
+            else []
+        )
+
         resources = (
             db.query(LearningResource)
             .options(joinedload(LearningResource.skill))
@@ -580,7 +612,15 @@ class LearningService:
             .all()
         )
 
-        # Ranking algorithm matching Section 15: role_match + concept_match + quality_rank
+        # Policy: Avoid YouTube video resources
+        resources = [
+            r for r in resources
+            if (r.provider or "").strip().lower() != "youtube"
+            and "youtube.com" not in (r.url or "").lower()
+            and "youtu.be" not in (r.url or "").lower()
+        ]
+
+        # Ranking algorithm: role_match + concept_match + quality_rank + platform_preference (Phase 21)
         def rank_resource(r: LearningResource) -> int:
             score = 0
             if r.concept_slug == module.slug:
@@ -591,6 +631,12 @@ class LearningService:
                 score += 20
             elif r.quality_rank == 2:
                 score += 10
+            # Platform preference boost — pure presentation, zero engine impact
+            provider_key = (r.provider or "").strip().lower().replace(" ", "")
+            if preferred_primary != "no_preference" and provider_key == preferred_primary:
+                score += 30
+            elif provider_key in preferred_secondary:
+                score += 15
             return score
 
         sorted_resources = sorted(resources, key=rank_resource, reverse=True)
@@ -613,29 +659,38 @@ class LearningService:
             for r in sorted_resources
         ]
 
-        # Comprehensive Structural Extensions (Phase 21)
-        subtopics = json.loads(module.subtopics) if module.subtopics else [
-            {"id": "objectives", "title": "1. What You Will Learn"},
-            {"id": "why-it-matters", "title": "2. Why This Matters for Your Role"},
-            {"id": "conceptual-foundation", "title": "3. Conceptual Foundation & Intuition"},
-            {"id": "step-by-step", "title": "4. Step-by-Step Breakdown & Mathematical Rigor"},
-            {"id": "code-examples", "title": "5. Practical Syntax-Highlighted Examples"},
-            {"id": "worked-example", "title": "6. Complete Step-by-Step Worked Problem"},
-            {"id": "common-mistakes", "title": "7. Common Industry Pitfalls & Fallacies"},
-            {"id": "quick-reference", "title": "8. Quick Reference Revision Sheet"},
-            {"id": "practice", "title": "9. Guided & Independent Practice Lab"},
-            {"id": "concept-check", "title": "10. Formative Concept Check (3-5 Questions)"},
-            {"id": "applied-task", "title": "11. Production Role Task & Evidence"},
-            {"id": "resources", "title": "12. Verified Authoritative External References"},
-        ]
+        # Comprehensive Structural Extensions (Phase 21 & Phase 22)
+        raw_subtopics = enh.get("subtopics") or (json.loads(module.subtopics) if module.subtopics else [])
+        subtopics = []
+        for i, s in enumerate(raw_subtopics):
+            if isinstance(s, dict):
+                subtopics.append(s)
+            else:
+                subtopics.append({"id": f"subtopic-{i}", "title": str(s)})
+        if not subtopics:
+            subtopics = [
+                {"id": "objectives", "title": "1. What You Will Learn"},
+                {"id": "why-it-matters", "title": "2. Why This Matters for Your Role"},
+                {"id": "conceptual-foundation", "title": "3. Conceptual Foundation & Intuition"},
+                {"id": "step-by-step", "title": "4. Step-by-Step Breakdown & Mathematical Rigor"},
+                {"id": "code-examples", "title": "5. Practical Syntax-Highlighted Examples"},
+                {"id": "worked-example", "title": "6. Complete Step-by-Step Worked Problem"},
+                {"id": "common-mistakes", "title": "7. Common Industry Pitfalls & Fallacies"},
+                {"id": "quick-reference", "title": "8. Quick Reference Revision Sheet"},
+                {"id": "practice", "title": "9. Guided & Independent Practice Lab"},
+                {"id": "concept-check", "title": "10. Formative Concept Check (3-5 Questions)"},
+                {"id": "applied-task", "title": "11. Production Role Task & Evidence"},
+                {"id": "resources", "title": "12. Verified Authoritative External References"},
+            ]
 
-        why_matters_map = json.loads(module.why_it_matters_by_role) if module.why_it_matters_by_role else {
+
+        why_matters_map = enh.get("why_it_matters_by_role") or (json.loads(module.why_it_matters_by_role) if module.why_it_matters_by_role else {
             "Data Analyst": f"Mastering {module.concept_name} allows Data Analysts to extract trustworthy business insights, evaluate KPIs rigorously, and prevent flawed executive decisions driven by noisy data.",
             "Data Scientist": f"For Data Scientists, {module.concept_name} provides the mathematical and algorithmic rigor necessary for robust predictive modeling, experiment evaluation, and reproducible machine learning.",
             "Python Developer": f"For Python Developers, {module.concept_name} ensures defensive architecture, high-performance data processing, clean APIs, and production reliability without unhandled edge cases.",
-        }
+        })
 
-        code_examples = json.loads(module.code_examples) if module.code_examples else (
+        code_examples = enh.get("code_examples") or (json.loads(module.code_examples) if module.code_examples else (
             [
                 {
                     "title": f"Implementation: {module.concept_name}",
@@ -644,9 +699,9 @@ class LearningService:
                     "explanation": worked_ex.get("explanation", ""),
                 }
             ] if worked_ex.get("code_or_query") else []
-        )
+        ))
 
-        quick_reference = json.loads(module.quick_reference) if module.quick_reference else {
+        quick_reference = enh.get("quick_reference") or (json.loads(module.quick_reference) if module.quick_reference else {
             "key_terms": [
                 {"term": module.concept_name, "definition": f"Core competency within {module_skill_name}."}
             ],
@@ -655,9 +710,9 @@ class LearningService:
                 f"Verify assumptions and edge cases before deploying {module.concept_name}.",
                 "Always measure outcomes with realistic test criteria and evidence."
             ]
-        }
+        })
 
-        level_variations = json.loads(module.level_variations) if module.level_variations else {
+        level_variations = enh.get("level_variations") or (json.loads(module.level_variations) if module.level_variations else {
             "Beginner": {
                 "level": "Beginner",
                 "focus": "Core Intuition & Fundamental Mental Models",
@@ -679,7 +734,7 @@ class LearningService:
                 "explanation_supplement": f"Explores statistical power, performance bottlenecks, non-parametric alternatives, and enterprise architectural patterns for {module.concept_name}.",
                 "key_additions": ["Architectural edge cases", "Performance profiling and trade-offs", "Production deployment rigor"]
             }
-        }
+        })
 
         # Calculate user's effective level for this skill
         dna_list = skill_dna_service.get_user_skill_dna(db, user_id)
@@ -770,9 +825,9 @@ class LearningService:
             prerequisite_concept_slugs=module.prerequisite_concept_slugs,
             target_role_name=module.target_role_name,
             learning_objectives=objectives,
-            explanation=module.explanation,
-            key_rules=module.key_rules,
-            common_mistakes=module.common_mistakes,
+            explanation=explanation_content,
+            key_rules=key_rules_content,
+            common_mistakes=common_mistakes_content,
             subtopics=subtopics,
             why_it_matters_by_role=why_matters_map,
             code_examples=code_examples,

@@ -793,5 +793,15 @@ from app.seed.role_modules_data import ADDITIONAL_LEARNING_MODULES_SEED, LEARNIN
 
 LEARNING_MODULES_SEED.extend(ADDITIONAL_LEARNING_MODULES_SEED)
 
+try:
+    from app.seed.comprehensive_learning_content import COMPREHENSIVE_MODULE_ENHANCEMENTS
+    for mod in LEARNING_MODULES_SEED:
+        enh = COMPREHENSIVE_MODULE_ENHANCEMENTS.get(mod["slug"])
+        if enh:
+            mod.update(enh)
+except ImportError:
+    pass
+
 __all__ = ["LEARNING_MODULES_SEED", "LEARNING_RESOURCES_SEED"]
+
 

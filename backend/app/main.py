@@ -23,6 +23,7 @@ from app.api.routes import (
     ml,
     auth,
     learning,
+    resource_preferences,
 )
 
 app = FastAPI(
@@ -123,6 +124,7 @@ app.include_router(skill_passport.router, prefix=settings.API_V1_STR)
 app.include_router(demo.router, prefix=settings.API_V1_STR)
 app.include_router(coach.router, prefix=settings.API_V1_STR)
 app.include_router(ml.router, prefix=settings.API_V1_STR)
+app.include_router(resource_preferences.router, prefix=settings.API_V1_STR)
 
 
 @app.get("/")

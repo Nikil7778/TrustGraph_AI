@@ -48,6 +48,10 @@ export default function OnboardingPage() {
   const [customGoalSkills, setCustomGoalSkills] = useState<string>('');
   const [isCreatingCustomGoal, setIsCreatingCustomGoal] = useState<boolean>(false);
 
+  // Learning Platform Preferences (Phase 21)
+  const [primaryPlatform, setPrimaryPlatform] = useState<string>('no_preference');
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
+
   // Pre-fill user details if logged in via Google
   useEffect(() => {
     if (activeUser) {
@@ -170,6 +174,22 @@ export default function OnboardingPage() {
         });
         if (newUser) {
           targetUserId = newUser.id;
+        }
+      }
+
+      // Persist Learning Platform Preferences (Phase 21)
+      const secondaries = selectedPlatforms.filter((p) => p !== primaryPlatform && p !== 'no_preference');
+      try {
+        await api.updatePreferencesResources({
+          primary_platform: primaryPlatform,
+          preferred_platforms: secondaries,
+        });
+      } catch {
+        if (targetUserId) {
+          await api.updateResourcePreferences(targetUserId, {
+            primary_platform: primaryPlatform,
+            secondary_platforms: secondaries,
+          }).catch(() => null);
         }
       }
 
@@ -523,7 +543,134 @@ export default function OnboardingPage() {
             </div>
           </div>
 
-          {/* SECTION 4: CALLS TO ACTION */}
+          {/* SECTION 4: LEARNING PREFERENCES */}
+          <div className="border-t border-slate-100 pt-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-blue-700" /> Learning preferences
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Choose where you prefer to learn. SkillPath will use this when recommending external resources.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setPrimaryPlatform('no_preference');
+                  setSelectedPlatforms([]);
+                }}
+                className={`px-3 py-1.5 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                  primaryPlatform === 'no_preference' && selectedPlatforms.length === 0
+                    ? 'bg-blue-50 border-blue-600 text-blue-800'
+                    : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                Let SkillPath choose
+              </button>
+            </div>
+
+            {/* Platform Tiles */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+              {[
+                { id: 'geeksforgeeks', label: 'GeeksforGeeks', desc: 'Syntax notes, algorithm walkthroughs & code snippets' },
+                { id: 'w3schools', label: 'W3Schools', desc: 'Try-it-yourself examples & quick reference guides' },
+                { id: 'khanacademy', label: 'Khan Academy', desc: 'Foundational concepts & intuitive math/logic practice' },
+                { id: 'coursera', label: 'Coursera', desc: 'Academic courses & university-backed guided modules' },
+                { id: 'datacamp', label: 'DataCamp', desc: 'Interactive data science & SQL tracks' },
+              ].map((platform) => {
+                const isSelected = selectedPlatforms.includes(platform.id);
+                const isPrimary = primaryPlatform === platform.id;
+
+                return (
+                  <div
+                    key={platform.id}
+                    onClick={() => {
+                      if (isSelected) {
+                        const next = selectedPlatforms.filter((p) => p !== platform.id);
+                        setSelectedPlatforms(next);
+                        if (isPrimary) {
+                          setPrimaryPlatform(next.length > 0 ? next[0] : 'no_preference');
+                        }
+                      } else {
+                        const next = [...selectedPlatforms, platform.id];
+                        setSelectedPlatforms(next);
+                        if (primaryPlatform === 'no_preference') {
+                          setPrimaryPlatform(platform.id);
+                        }
+                      }
+                    }}
+                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer select-none flex flex-col justify-between ${
+                      isSelected
+                        ? 'border-blue-600 bg-blue-50/40 shadow-xs'
+                        : 'border-slate-200 bg-white hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-900">{platform.label}</span>
+                        <div
+                          className={`w-4 h-4 rounded flex items-center justify-center border text-xs ${
+                            isSelected
+                              ? 'bg-blue-600 border-blue-600 text-white'
+                              : 'border-slate-300 bg-white'
+                          }`}
+                        >
+                          {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                        </div>
+                      </div>
+                      <p className="text-[11px] text-slate-500 leading-snug">{platform.desc}</p>
+                    </div>
+
+                    {isSelected && (
+                      <div className="mt-2.5 pt-2 border-t border-blue-100 flex items-center justify-between">
+                        {isPrimary ? (
+                          <span className="text-[10px] font-bold text-blue-800 bg-blue-100 px-2 py-0.5 rounded">
+                            Primary Platform
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPrimaryPlatform(platform.id);
+                            }}
+                            className="text-[10px] font-bold text-slate-500 hover:text-blue-700 underline cursor-pointer"
+                          >
+                            Set as Primary
+                          </button>
+                        )}
+                        <span className="text-[10px] text-slate-400">
+                          {isPrimary ? 'Highest Priority' : 'Secondary'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {selectedPlatforms.length > 1 && (
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <span className="text-xs font-medium text-slate-700">
+                  Designated Primary Platform:
+                </span>
+                <select
+                  value={primaryPlatform}
+                  onChange={(e) => setPrimaryPlatform(e.target.value)}
+                  className="bg-white border border-slate-300 rounded px-2.5 py-1 text-xs font-bold text-slate-900 focus:outline-none"
+                >
+                  {selectedPlatforms.map((pId) => (
+                    <option key={pId} value={pId}>
+                      {pId.toUpperCase()} (Primary)
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
+          {/* SECTION 5: CALLS TO ACTION */}
           <div className="pt-4 border-t border-slate-100 space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Option 1: Direct Initial Diagnostic Assessment (Recommended) */}

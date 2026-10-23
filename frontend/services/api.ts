@@ -65,6 +65,37 @@ export interface ApiUserCreate {
   learning_goal: string;
 }
 
+export interface ApiResourcePreference {
+  user_id: number;
+  primary_platform: string;
+  preferred_platforms?: string[];
+  secondary_platforms: string[];
+}
+
+export interface ApiResourcePreferenceUpdate {
+  primary_platform?: string;
+  preferred_platforms?: string[];
+  secondary_platforms?: string[];
+}
+
+export interface ApiRecommendedResource {
+  id: number;
+  title: string;
+  provider: string;
+  url: string;
+  description?: string;
+  concept_slug: string;
+  concept_name: string;
+  skill_name?: string;
+  difficulty: string;
+  resource_type: string;
+  estimated_minutes: number;
+  verified: boolean;
+  selection_reason: string;
+  is_preferred_platform: boolean;
+  platform_match_type: 'primary' | 'secondary' | 'skillpath_fallback' | 'automatic';
+}
+
 export interface ApiAssessmentQuestionPublic {
   id: number;
   assessment_id: number;
@@ -429,6 +460,57 @@ export const api = {
   async getUserSkills(userId: number): Promise<ApiUserSkill[]> {
     const res = await fetch(`${API_BASE_URL}/users/${userId}/skills`, { cache: 'no-store' });
     return handleResponse<ApiUserSkill[]>(res);
+  },
+
+  // Learning Platform Preferences (Phase 21)
+  async getPreferencesResources(): Promise<ApiResourcePreference> {
+    const res = await fetch(`${API_BASE_URL}/preferences/resources`, {
+      headers: getAuthHeaders(),
+      credentials: 'include',
+      cache: 'no-store',
+    });
+    return handleResponse<ApiResourcePreference>(res);
+  },
+
+  async updatePreferencesResources(
+    payload: ApiResourcePreferenceUpdate
+  ): Promise<ApiResourcePreference> {
+    const res = await fetch(`${API_BASE_URL}/preferences/resources`, {
+      method: 'PUT',
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<ApiResourcePreference>(res);
+  },
+
+  async getRecommendedResource(concept: string): Promise<ApiRecommendedResource> {
+    const res = await fetch(`${API_BASE_URL}/resources/recommended/${encodeURIComponent(concept)}`, {
+      headers: getAuthHeaders(),
+      credentials: 'include',
+      cache: 'no-store',
+    });
+    return handleResponse<ApiRecommendedResource>(res);
+  },
+
+  async getResourcePreferences(userId: number): Promise<ApiResourcePreference> {
+    const res = await fetch(`${API_BASE_URL}/users/${userId}/resource-preferences`, {
+      headers: getAuthHeaders(),
+      cache: 'no-store',
+    });
+    return handleResponse<ApiResourcePreference>(res);
+  },
+
+  async updateResourcePreferences(
+    userId: number,
+    payload: ApiResourcePreferenceUpdate
+  ): Promise<ApiResourcePreference> {
+    const res = await fetch(`${API_BASE_URL}/users/${userId}/resource-preferences`, {
+      method: 'PUT',
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<ApiResourcePreference>(res);
   },
 
   // Assessments
@@ -1726,12 +1808,18 @@ export interface ApiLearningModuleSummary {
 export interface ApiWorkedExample {
   title?: string;
   scenario?: string;
+  problem?: string;
+  approach?: string;
   code_or_query?: string;
   code?: string;
-  explanation?: string;
-  reasoning?: string;
+  solution?: string;
   output?: string;
   expected_output?: string;
+  result?: string;
+  explanation?: string;
+  reasoning?: string;
+  why_it_works?: string;
+  alternative?: string;
 }
 
 export interface ApiGuidedExercise {

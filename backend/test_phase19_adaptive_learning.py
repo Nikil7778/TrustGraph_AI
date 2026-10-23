@@ -53,6 +53,10 @@ class TestPhase19AdaptiveLearning(unittest.TestCase):
         reset_alex_mercer(cls.db)
         cls.db.close()
 
+    def setUp(self):
+        self.db.rollback()
+        self.db.expire_all()
+
     @classmethod
     def _cleanup_test_learners(cls, db: Session):
         test_emails = [

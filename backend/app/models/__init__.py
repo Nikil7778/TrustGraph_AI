@@ -10,6 +10,7 @@ from app.models.roadmap import Roadmap, RoadmapStep, RoadmapChange
 from app.models.project import Project, ProjectAttempt
 from app.models.industry_lab import IndustryLab, IndustryLabTask, IndustryLabAttempt
 from app.models.ml_prediction import MLPrediction
+from app.models.resource_preference import UserResourcePreference, LearnerResourcePreference
 
 __all__ = [
     "Base",
@@ -35,5 +36,7 @@ __all__ = [
     "IndustryLabTask",
     "IndustryLabAttempt",
     "MLPrediction",
+    "UserResourcePreference",
+    "LearnerResourcePreference",
 ]
 
